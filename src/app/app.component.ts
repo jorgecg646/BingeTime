@@ -1,23 +1,51 @@
-import { Component, signal, computed, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, signal, computed, inject, effect, OnInit, OnDestroy } from '@angular/core';
+import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { TVShow, WatchedShow } from './models';
 import { TvmazeService } from './services/tvmaze.service';
+import { CounterComponent } from './components/counter/counter.component';
+import { YourShowsComponent } from './components/your-shows/your-shows.component';
+import { TrendingComponent } from './components/trending/trending.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [SlicePipe, FormsModule, CounterComponent, YourShowsComponent, TrendingComponent],
   template: `
     <div class="min-h-screen flex flex-col relative overflow-hidden">
-      <!-- Aurora + grid background -->
-      <div class="fixed inset-0 pointer-events-none">
-        <div class="aurora-blob absolute -top-32 left-1/4 w-[40rem] h-[40rem] bg-indigo-500/10 rounded-full blur-[120px]"></div>
-        <div class="aurora-blob absolute top-1/3 -right-32 w-[36rem] h-[36rem] bg-teal-500/10 rounded-full blur-[120px]" style="animation-delay: -6s;"></div>
-        <div class="aurora-blob absolute bottom-0 left-1/3 w-[32rem] h-[32rem] bg-sky-500/[0.07] rounded-full blur-[120px]" style="animation-delay: -12s;"></div>
-        <div class="absolute inset-0" style="background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 60px 60px;"></div>
-        <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80"></div>
+      <!-- Dynamic series background slideshow -->
+      <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <!-- Background 1 -->
+        @if (bgImage1()) {
+          <img 
+            [src]="bgImage1()" 
+            class="absolute inset-0 w-full h-full object-cover"
+            style="transition: opacity 2s ease-in-out;"
+            [style.opacity]="bg1Visible() ? 0.35 : 0"
+            alt=""
+          />
+        }
+        <!-- Background 2 -->
+        @if (bgImage2()) {
+          <img 
+            [src]="bgImage2()" 
+            class="absolute inset-0 w-full h-full object-cover"
+            style="transition: opacity 2s ease-in-out;"
+            [style.opacity]="!bg1Visible() ? 0.35 : 0"
+            alt=""
+          />
+        }
+        
+        <!-- Aurora blobs overlay -->
+        <div class="aurora-blob absolute -top-32 left-1/4 w-[40rem] h-[40rem] bg-rose-500/10 rounded-full blur-[120px]"></div>
+        <div class="aurora-blob absolute top-1/3 -right-32 w-[36rem] h-[36rem] bg-red-500/10 rounded-full blur-[120px]" style="animation-delay: -6s;"></div>
+        <div class="aurora-blob absolute bottom-0 left-1/3 w-[32rem] h-[32rem] bg-amber-500/5 rounded-full blur-[120px]" style="animation-delay: -12s;"></div>
+        
+        <!-- Grid pattern overlay -->
+        <div class="absolute inset-0" style="background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 60px 60px;"></div>
+        <!-- Vignette/Shadows overlay -->
+        <div class="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-slate-950/80 to-slate-950"></div>
       </div>
 
       <!-- Header -->
@@ -39,44 +67,15 @@ import { TvmazeService } from './services/tvmaze.service';
         </div>
       </header>
 
-      <main class="flex-1 container mx-auto px-4 py-8 max-w-4xl relative z-10">
-        <!-- Time display -->
-        <div class="glass-strong rounded-3xl p-8 md:p-12 mb-10 animate-fade-in">
-          <div class="flex items-stretch justify-center gap-2 md:gap-6">
-            <div class="flex-1 text-center group">
-              <div class="relative flex items-center justify-center rounded-2xl py-4 transition-colors group-hover:bg-white/[0.03]">
-                <div class="text-5xl md:text-8xl font-bold tracking-tighter text-white tabular-nums animate-count">{{ days() }}</div>
-              </div>
-              <div class="text-zinc-500 text-xs md:text-sm uppercase tracking-[0.2em] mt-2 font-medium">Days</div>
-            </div>
-            <div class="flex items-center pb-7 text-4xl md:text-6xl font-light text-zinc-700">:</div>
-            <div class="flex-1 text-center group">
-              <div class="relative flex items-center justify-center rounded-2xl py-4 transition-colors group-hover:bg-white/[0.03]">
-                <div class="text-5xl md:text-8xl font-bold tracking-tighter text-white tabular-nums animate-count">{{ hours() }}</div>
-              </div>
-              <div class="text-zinc-500 text-xs md:text-sm uppercase tracking-[0.2em] mt-2 font-medium">Hours</div>
-            </div>
-            <div class="flex items-center pb-7 text-4xl md:text-6xl font-light text-zinc-700">:</div>
-            <div class="flex-1 text-center group">
-              <div class="relative flex items-center justify-center rounded-2xl py-4 transition-colors group-hover:bg-white/[0.03]">
-                <div class="text-5xl md:text-8xl font-bold tracking-tighter text-white tabular-nums animate-count">{{ minutes() }}</div>
-              </div>
-              <div class="text-zinc-500 text-xs md:text-sm uppercase tracking-[0.2em] mt-2 font-medium">Minutes</div>
-            </div>
-          </div>
-          @if (totalEpisodes() > 0) {
-            <div class="mt-8 pt-8 border-t border-white/5 flex items-center justify-center gap-8 text-sm">
-              <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span class="text-zinc-400"><span class="text-white font-semibold tabular-nums">{{ totalEpisodes() }}</span> episodes</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
-                <span class="text-zinc-400"><span class="text-white font-semibold tabular-nums">{{ watchedShows().length }}</span> shows</span>
-              </div>
-            </div>
-          }
-        </div>
+      <main class="flex-1 container mx-auto px-4 md:px-8 py-8 max-w-[1600px] relative z-10">
+        <!-- Counter Component -->
+        <app-counter 
+          [days]="days()" 
+          [hours]="hours()" 
+          [minutes]="minutes()" 
+          [totalEpisodes]="totalEpisodes()" 
+          [watchedShowsCount]="watchedShows().length">
+        </app-counter>
 
         <!-- Search -->
         <div class="relative mb-10">
@@ -105,7 +104,7 @@ import { TvmazeService } from './services/tvmaze.service';
             <div class="absolute z-50 w-full mt-2 glass-strong rounded-xl overflow-hidden animate-fade-in-scale">
               @for (show of searchResults; track show.id) {
                 <button (click)="selectShow(show)" class="w-full flex items-center gap-4 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0">
-                  <img [src]="imageUrl(show.poster_path)" [alt]="show.name" class="w-10 h-14 object-cover rounded-lg" />
+                  <img [src]="show.poster_path" [alt]="show.name" class="w-10 h-14 object-cover rounded-lg" />
                   <div class="flex-1 min-w-0">
                     <h3 class="font-medium text-white truncate">{{ show.name }}</h3>
                     <div class="flex items-center gap-2 text-xs text-zinc-500">
@@ -127,65 +126,15 @@ import { TvmazeService } from './services/tvmaze.service';
           }
         </div>
 
-        <!-- Show list -->
+        <!-- Watchlist (Your Shows) -->
         @if (watchedShows().length > 0) {
-          <div class="space-y-3">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-sm font-medium text-zinc-500 uppercase tracking-wider">Your shows</h2>
-              <span class="text-xs text-zinc-600">{{ watchedShows().length }} shows</span>
-            </div>
-            @for (item of watchedShows(); track item.show.id; let i = $index) {
-              <div class="glass rounded-xl p-4 flex items-center gap-4 animate-slide-up hover-lift group" [style.animation-delay]="i * 50 + 'ms'">
-                <img [src]="imageUrl(item.show.poster_path)" [alt]="item.show.name" class="w-12 h-16 object-cover rounded-lg" />
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <h3 class="font-medium text-white truncate">{{ item.show.name }}</h3>
-                    @if (item.show.rating !== null) {
-                      <span class="flex items-center gap-1 shrink-0 text-xs font-semibold text-amber-400">
-                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
-                        {{ item.show.rating }}/10
-                      </span>
-                    }
-                  </div>
-                  <div class="flex items-center gap-2 text-xs text-zinc-500 mt-1">
-                    <span>{{ item.seasonsWatched }}/{{ item.show.number_of_seasons }} seasons</span>
-                    <span class="w-1.5 h-1.5 rounded-full bg-zinc-700"></span>
-                    <span>{{ item.episodesWatched }} eps</span>
-                  </div>
-                  <div class="flex items-center gap-2 mt-2">
-                    <span class="text-xs text-zinc-500">Your rating:</span>
-                    <select [ngModel]="item.userRating" (ngModelChange)="setUserRating(item, +$event)" class="bg-white/5 border border-white/10 rounded-md px-2 py-0.5 text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer">
-                      <option [ngValue]="0" class="bg-zinc-900">--</option>
-                      @for (n of ratingOptions; track n) {
-                        <option [ngValue]="n" class="bg-zinc-900">{{ n }}</option>
-                      }
-                    </select>
-                    @if (item.userRating > 0) {
-                      <span class="text-xs font-semibold text-yellow-400">{{ item.userRating }}/10</span>
-                    }
-                  </div>
-                </div>
-                <div class="flex items-center gap-3">
-                  <div class="text-sm font-semibold text-white">{{ formatTime(item.totalMinutes) }}</div>
-                  <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    @if (item.seasonsWatched > 1) {
-                      <button (click)="changeSeason(item, -1)" class="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all" title="Remove season">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
-                      </button>
-                    }
-                    @if (item.seasonsWatched < item.show.number_of_seasons) {
-                      <button (click)="changeSeason(item, 1)" class="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/10 transition-all" title="Add season">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                      </button>
-                    }
-                    <button (click)="removeShow(item.show.id)" class="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all" title="Delete show">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            }
-          </div>
+          <app-your-shows
+            [watchedShows]="watchedShows()"
+            (openDetails)="openDetails($event)"
+            (changeSeason)="changeSeason($event.item, $event.delta)"
+            (removeShow)="removeShow($event)"
+            (setUserRating)="setUserRating($event.item, $event.rating)">
+          </app-your-shows>
         } @else {
           <div class="text-center py-16">
             <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl glass mb-5">
@@ -194,14 +143,20 @@ import { TvmazeService } from './services/tvmaze.service';
               </svg>
             </div>
             <h3 class="text-lg font-medium text-zinc-300 mb-2">No shows yet</h3>
-            <p class="text-zinc-600 text-sm">Search for a show to get started</p>
+            <p class="text-zinc-600 text-sm">Search or choose a trending show below to get started</p>
           </div>
         }
+
+        <!-- Trending Section -->
+        <app-trending 
+          [trendingShows]="trendingShows()" 
+          (openDetails)="openDetails($event)">
+        </app-trending>
       </main>
 
       <!-- Footer -->
       <footer class="py-8 border-t border-white/5 mt-auto relative z-10">
-        <div class="container mx-auto px-4 max-w-4xl">
+        <div class="container mx-auto px-4 md:px-8 max-w-[1600px]">
           <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
             <div class="flex items-center gap-4 text-zinc-600">
               <span>Data from</span>
@@ -220,7 +175,7 @@ import { TvmazeService } from './services/tvmaze.service';
         <div class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4" (click)="closeModal()">
           <div class="glass-strong rounded-2xl p-6 max-w-md w-full animate-fade-in-scale" (click)="$event.stopPropagation()">
             <div class="flex items-start gap-4 mb-8">
-              <img [src]="imageUrl(selectedShow.poster_path)" [alt]="selectedShow.name" class="w-20 h-28 object-cover rounded-xl shadow-2xl" />
+              <img [src]="selectedShow.poster_path" [alt]="selectedShow.name" class="w-20 h-28 object-cover rounded-xl shadow-2xl" />
               <div class="flex-1">
                 <h3 class="text-xl font-bold text-white mb-1">{{ selectedShow.name }}</h3>
                 <div class="flex items-center gap-3 text-sm text-zinc-500">
@@ -251,13 +206,124 @@ import { TvmazeService } from './services/tvmaze.service';
           </div>
         </div>
       }
+
+      <!-- Show details modal -->
+      @if (activeShowForDetails()) {
+        <div class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in" (click)="closeDetailsModal()">
+          <div class="glass-strong rounded-3xl p-6 md:p-8 max-w-2xl w-full animate-fade-in-scale relative overflow-hidden" (click)="$event.stopPropagation()">
+            <!-- Close button -->
+            <button (click)="closeDetailsModal()" class="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all z-10">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <div class="flex flex-col md:flex-row gap-6 relative">
+              <!-- Poster -->
+              <div class="w-full md:w-48 shrink-0 flex justify-center md:block">
+                <img [src]="activeShowForDetails()!.poster_path" [alt]="activeShowForDetails()!.name" class="w-40 h-56 md:w-48 md:h-68 object-cover rounded-2xl shadow-2xl border border-white/10" />
+              </div>
+              
+              <!-- Content -->
+              <div class="flex-1 min-w-0 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-2xl md:text-3xl font-extrabold text-white mb-2 leading-tight">{{ activeShowForDetails()!.name }}</h3>
+                  
+                  <div class="flex flex-wrap items-center gap-3 text-xs md:text-sm text-zinc-400 mb-4">
+                    <span>{{ activeShowForDetails()!.first_air_date | slice:0:4 }}</span>
+                    @if (activeShowForDetails()!.number_of_seasons) {
+                      <span class="w-1 h-1 rounded-full bg-zinc-600"></span>
+                      <span>{{ activeShowForDetails()!.number_of_seasons }} seasons</span>
+                    }
+                    <span class="w-1 h-1 rounded-full bg-zinc-600"></span>
+                    <span>~{{ activeShowForDetails()!.episode_run_time }} min/ep</span>
+                    @if (activeShowForDetails()!.rating !== null) {
+                      <span class="w-1 h-1 rounded-full bg-zinc-600"></span>
+                      <span class="flex items-center gap-1 font-semibold text-amber-400">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                        {{ activeShowForDetails()!.rating }}/10
+                      </span>
+                    }
+                  </div>
+                  
+                  <!-- Scrollable Summary -->
+                  <div class="text-zinc-300 text-sm leading-relaxed mb-6 max-h-48 overflow-y-auto pr-2" [innerHTML]="activeShowForDetails()!.summary || '<p class=text-zinc-500>No description available.</p>'"></div>
+                </div>
+                
+                 <!-- Action section inside Details Modal -->
+                <div class="pt-4 border-t border-white/5 mt-auto">
+                  @let instances = getShowInstances(activeShowForDetails()!.id);
+                  <div class="flex flex-col gap-4">
+                    @if (instances.length > 0) {
+                      <div class="flex items-center justify-between text-sm text-zinc-400">
+                        <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                          <span>Added {{ instances.length }} {{ instances.length === 1 ? 'time' : 'times' }}</span>
+                        </span>
+                      </div>
+                      
+                      <!-- Render controls for each instance -->
+                      <div class="space-y-3 max-h-48 overflow-y-auto pr-1">
+                        @for (watchedItem of instances; track watchedItem.instanceId; let idx = $index) {
+                          <div class="flex flex-wrap items-center justify-between gap-4 bg-white/5 rounded-xl p-3 border border-white/5 text-xs">
+                            <div class="font-semibold text-zinc-300">Copy #{{ idx + 1 }}</div>
+                            <!-- Seasons -->
+                            <div class="flex items-center gap-2">
+                              <span class="text-zinc-500 uppercase text-[9px] font-bold">Seasons:</span>
+                              <span class="text-white font-extrabold">{{ watchedItem.seasonsWatched }}/{{ watchedItem.show.number_of_seasons }}</span>
+                              <div class="flex items-center gap-0.5">
+                                @if (watchedItem.seasonsWatched > 1) {
+                                  <button (click)="changeSeason(watchedItem, -1)" class="p-1 rounded bg-white/5 text-zinc-400 hover:text-white transition-all">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                                  </button>
+                                }
+                                @if (watchedItem.seasonsWatched < watchedItem.show.number_of_seasons) {
+                                  <button (click)="changeSeason(watchedItem, 1)" class="p-1 rounded bg-white/5 text-zinc-300 hover:text-white transition-all">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                  </button>
+                                }
+                              </div>
+                            </div>
+                            
+                            <!-- Rating -->
+                            <div class="flex items-center gap-1.5">
+                              <span class="text-zinc-500 uppercase text-[9px] font-bold">Rating:</span>
+                              <select [ngModel]="watchedItem.userRating" (ngModelChange)="setUserRating(watchedItem, +$event)" class="bg-zinc-800 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer">
+                                <option [ngValue]="0">--</option>
+                                @for (n of ratingOptions; track n) {
+                                  <option [ngValue]="n">{{ n }}</option>
+                                }
+                              </select>
+                            </div>
+
+                            <!-- Delete -->
+                            <button (click)="removeShow(watchedItem.instanceId); (getShowInstances(activeShowForDetails()!.id).length === 0 ? closeDetailsModal() : null)" class="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0" title="Delete copy">
+                              <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    }
+
+                    <!-- Button to add another copy / new show -->
+                    <button (click)="closeDetailsModal(); selectShow(activeShowForDetails()!)" class="px-5 py-2.5 bg-white text-black hover:bg-zinc-200 rounded-xl font-semibold text-sm transition-all shadow-lg flex items-center gap-2 w-full justify-center">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                      <span>{{ instances.length > 0 ? 'Add another copy' : 'Add to watchlist' }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
-export class AppComponent {
+export class AppComponent implements OnInit, OnDestroy {
   private tvmaze = inject(TvmazeService);
 
   watchedShows = signal<WatchedShow[]>(this.loadFromStorage());
+  trendingShows = signal<TVShow[]>([]);
+  activeShowForDetails = signal<TVShow | null>(null);
 
   searchQuery = '';
   searchResults: TVShow[] = [];
@@ -267,6 +333,25 @@ export class AppComponent {
   selectedShow: TVShow | null = null;
   seasonsToAdd = 0;
   ratingOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  // Background images derived from user's watchlist
+  bgImages = computed(() => {
+    const shows = this.watchedShows();
+    const defaultImage = 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253519.jpg';
+    if (shows.length === 0) {
+      return [defaultImage];
+    }
+    return shows
+      .map(w => w.show.poster_path)
+      .filter((path): path is string => !!path)
+      .map(path => path.replace('medium_portrait', 'original_untouched'));
+  });
+
+  bgImage1 = signal<string>('');
+  bgImage2 = signal<string>('');
+  bg1Visible = signal<boolean>(true);
+  private currentBgIndex = 0;
+  private bgIntervalId: any;
 
   /* Derived totals */
   totalMinutes = computed(() => this.watchedShows().reduce((s, w) => s + w.totalMinutes, 0));
@@ -290,6 +375,92 @@ export class AppComponent {
       this.searchResults = results;
       this.isLoading = false;
     });
+
+    // Effect to monitor changes in bgImages and sync the initial background or index
+    effect(() => {
+      const images = this.bgImages();
+      if (this.currentBgIndex >= images.length) {
+        this.currentBgIndex = 0;
+      }
+
+      // Update image sources dynamically when list changes
+      if (images.length === 1) {
+        this.bgImage1.set(images[0]);
+        this.bg1Visible.set(true);
+      } else if (images.length > 1 && !this.bgImage1() && !this.bgImage2()) {
+        this.bgImage1.set(images[0]);
+        this.bg1Visible.set(true);
+      }
+    });
+  }
+
+  ngOnInit() {
+    const images = this.bgImages();
+    if (images.length > 0) {
+      this.bgImage1.set(images[0]);
+    }
+    this.startBgSlideshow();
+    this.loadTrendingShows();
+  }
+
+  loadTrendingShows() {
+    this.tvmaze.getPopularShows().subscribe(shows => {
+      this.trendingShows.set(shows);
+    });
+  }
+
+  openDetails(show: TVShow): void {
+    if (show.summary) {
+      this.activeShowForDetails.set(show);
+    } else {
+      this.isLoading = true;
+      this.tvmaze.getShowDetails(show.id).subscribe(result => {
+        this.isLoading = false;
+        if (result) {
+          this.activeShowForDetails.set(result);
+        }
+      });
+    }
+  }
+
+  closeDetailsModal(): void {
+    this.activeShowForDetails.set(null);
+  }
+
+  getShowInstances(showId: number): WatchedShow[] {
+    return this.watchedShows().filter(w => w.show.id === showId);
+  }
+
+  ngOnDestroy() {
+    if (this.bgIntervalId) {
+      clearInterval(this.bgIntervalId);
+    }
+  }
+
+  private startBgSlideshow() {
+    if (this.bgIntervalId) clearInterval(this.bgIntervalId);
+
+    this.bgIntervalId = setInterval(() => {
+      const images = this.bgImages();
+      if (images.length <= 1) {
+        if (images.length === 1) {
+          this.bgImage1.set(images[0]);
+          this.bg1Visible.set(true);
+        }
+        return;
+      }
+
+      this.currentBgIndex = (this.currentBgIndex + 1) % images.length;
+      const nextImg = images[this.currentBgIndex];
+
+      if (this.bg1Visible()) {
+        this.bgImage2.set(nextImg);
+        this.bg1Visible.set(false);
+      } else {
+        this.bgImage1.set(nextImg);
+        this.bg1Visible.set(true);
+      }
+    }, 10000); // Cambia cada 10 segundos
   }
 
   /* ---------------------- Search UI ---------------------- */
@@ -327,18 +498,16 @@ export class AppComponent {
   /* ---------------------- Mutations ---------------------- */
   addShow(): void {
     if (!this.selectedShow || this.seasonsToAdd === 0) return;
-    if (this.watchedShows().some(w => w.show.id === this.selectedShow!.id)) {
-      this.closeModal();
-      return;
-    }
     const t = this.calculateTime(this.selectedShow, this.seasonsToAdd);
-    this.watchedShows.update(list => [...list, {
+    const newInstance: WatchedShow = {
+      instanceId: this.selectedShow.id.toString() + '_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5),
       show: this.selectedShow!,
       seasonsWatched: this.seasonsToAdd,
       totalMinutes: t.minutes,
       episodesWatched: t.episodes,
       userRating: 0
-    }]);
+    };
+    this.watchedShows.update(list => [newInstance, ...list]);
     this.save();
     this.closeModal();
   }
@@ -348,19 +517,19 @@ export class AppComponent {
     if (newSeasons < 1 || newSeasons > item.show.number_of_seasons) return;
     const t = this.calculateTime(item.show, newSeasons);
     this.watchedShows.update(list => list.map(w =>
-      w.show.id === item.show.id ? { ...w, seasonsWatched: newSeasons, totalMinutes: t.minutes, episodesWatched: t.episodes } : w
+      w.instanceId === item.instanceId ? { ...w, seasonsWatched: newSeasons, totalMinutes: t.minutes, episodesWatched: t.episodes } : w
     ));
     this.save();
   }
 
-  removeShow(id: number): void {
-    this.watchedShows.update(list => list.filter(w => w.show.id !== id));
+  removeShow(instanceId: string): void {
+    this.watchedShows.update(list => list.filter(w => w.instanceId !== instanceId));
     this.save();
   }
 
   setUserRating(item: WatchedShow, rating: number): void {
     this.watchedShows.update(list => list.map(w =>
-      w.show.id === item.show.id ? { ...w, userRating: rating } : w
+      w.instanceId === item.instanceId ? { ...w, userRating: rating } : w
     ));
     this.save();
   }
@@ -377,19 +546,6 @@ export class AppComponent {
     this.seasonsToAdd = 0;
   }
 
-  /* ---------------------- Helpers ---------------------- */
-  imageUrl(path: string | null): string {
-    return path || 'https://via.placeholder.com/210x295/1e293b/6366f1?text=No+Image';
-  }
-
-  formatTime(minutes: number): string {
-    const d = Math.floor(minutes / 1440);
-    const h = Math.floor((minutes % 1440) / 60);
-    const m = minutes % 60;
-    if (d > 0) return `${d}d ${h}h`;
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
-  }
 
   /* ---------------------- Storage ---------------------- */
   private save(): void {
@@ -398,7 +554,11 @@ export class AppComponent {
 
   private loadFromStorage(): WatchedShow[] {
     try {
-      return JSON.parse(localStorage.getItem('watchedShows') || '[]');
+      const data = JSON.parse(localStorage.getItem('watchedShows') || '[]');
+      return data.map((w: any) => ({
+        ...w,
+        instanceId: w.instanceId || w.show.id.toString() + '_' + Math.random().toString(36).substr(2, 5)
+      }));
     } catch {
       return [];
     }

@@ -34,16 +34,33 @@ export class TvmazeService {
     );
   }
 
+
+  getPopularShows(): Observable<TVShow[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/shows?page=0`).pipe(
+      map(shows => {
+        if (!Array.isArray(shows)) return [];
+        // Sort by weight descending to get the most popular shows on the page
+        return shows
+          .filter(show => show.image?.medium)
+          .sort((a, b) => (b.weight || 0) - (a.weight || 0))
+          .slice(0, 15)
+          .map(show => this.mapShow(show));
+      }),
+      catchError(() => of([]))
+    );
+  }
+
   private mapShow(show: any): TVShow {
     return {
       id: show.id,
       name: show.name,
-      poster_path: show.image?.medium || null,
+      poster_path: show.image?.medium || 'https://via.placeholder.com/210x295/1e293b/6366f1?text=No+Image',
       first_air_date: show.premiered || '',
       number_of_seasons: 0,
       episode_run_time: show.averageRuntime || show.runtime || 45,
       rating: show.rating?.average ?? null,
-      seasons: []
+      seasons: [],
+      summary: show.summary || ''
     };
   }
 }

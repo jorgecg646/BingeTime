@@ -3,20 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 3%;
-  --foreground: 0 0% 98%;
-  --card: 0 0% 6%;
-  --card-foreground: 0 0% 98%;
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 15%;
+  --card-foreground: 210 40% 98%;
   --primary: 0 0% 98%;
   --primary-foreground: 0 0% 3%;
   --secondary: 0 0% 12%;
   --secondary-foreground: 0 0% 98%;
   --muted: 0 0% 15%;
   --muted-foreground: 0 0% 65%;
-  --accent: 262 83% 58%;
+  --accent: 354 84% 57%;
   --accent-foreground: 0 0% 98%;
   --border: 0 0% 15%;
-  --ring: 262 83% 58%;
+  --ring: 354 84% 57%;
   --radius: 0.75rem;
 }
 
@@ -63,6 +63,15 @@ input:focus, button:focus {
 
 /* Selection */
 ::selection {
-  background: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

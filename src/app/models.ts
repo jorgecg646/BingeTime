@@ -7,6 +7,7 @@ export interface TVShow {
   episode_run_time: number;
   rating: number | null;
   seasons: Season[];
+  summary?: string;
 }
 
 export interface Season {
@@ -15,6 +16,7 @@ export interface Season {
 }
 
 export interface WatchedShow {
+  instanceId: string;
   show: TVShow;
   seasonsWatched: number;
   totalMinutes: number;
