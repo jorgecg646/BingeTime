@@ -21,12 +21,18 @@ import { WatchedShow, TVShow } from '../../models';
               <!-- Poster Image -->
               <img [src]="item.show.poster_path" [alt]="item.show.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
               
-              <!-- Blue Trash Can Button for mobile/tablet (no hover) -->
+              <!-- Golden Circular Delete Button (Always visible) -->
               <button (click)="removeShow.emit(item.instanceId); $event.stopPropagation()" 
-                      class="absolute top-2 right-2 z-20 md:hidden p-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg backdrop-blur-sm transition-all active:scale-95 flex items-center justify-center border border-blue-500/30" 
+                      class="absolute top-2 right-2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full border-4 border-amber-500 bg-black/60 text-amber-500 hover:bg-amber-500 hover:text-black transition-all flex items-center justify-center active:scale-95" 
                       title="Delete show">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                <svg class="w-4 h-4 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
+              
+              <!-- Default Bottom Info Overlay -->
+              <div class="absolute bottom-0 inset-x-0 p-2 sm:p-3 bg-gradient-to-t from-black/95 via-black/40 to-transparent pointer-events-none flex items-end justify-between gap-2 z-10">
+                <h4 class="text-white text-xs sm:text-lg font-bold leading-tight line-clamp-1 drop-shadow-md">{{ item.show.name }}</h4>
+                <span class="text-white text-sm sm:text-xl font-black shrink-0 drop-shadow-md">{{ item.seasonsWatched }}</span>
+              </div>
               
               <!-- Glassmorphic Hover Overlay -->
               <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/85 backdrop-blur-md flex flex-col justify-between p-2 sm:p-5 select-none cursor-pointer"
