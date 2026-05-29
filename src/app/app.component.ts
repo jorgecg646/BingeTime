@@ -148,10 +148,12 @@ import { TrendingComponent } from './components/trending/trending.component';
         }
 
         <!-- Trending Section -->
-        @defer (on idle) {
+        @defer (on viewport) {
           <app-trending 
             (openDetails)="openDetails($event)">
           </app-trending>
+        } @placeholder {
+          <div class="h-40"></div>
         }
       </main>
 
