@@ -259,28 +259,28 @@ import { TrendingComponent } from './components/trending/trending.component';
                       <div class="flex items-center justify-between text-sm text-zinc-400">
                         <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
                           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                          <span>Added {{ instances.length }} {{ instances.length === 1 ? 'time' : 'times' }}</span>
+                          <span>Watched {{ instances.length }} {{ instances.length === 1 ? 'time' : 'times' }}</span>
                         </span>
                       </div>
                       
                       <!-- Render controls for each instance -->
                       <div class="space-y-3 max-h-48 overflow-y-auto pr-1">
                         @for (watchedItem of instances; track watchedItem.instanceId; let idx = $index) {
-                          <div class="flex flex-wrap items-center justify-between gap-4 bg-white/5 rounded-xl p-3 border border-white/5 text-xs">
+                          <div class="flex flex-wrap items-center justify-between gap-4 bg-white/5 rounded-xl p-4 md:p-3 border border-white/5 text-sm md:text-xs">
                             <div class="font-semibold text-zinc-300">Copy #{{ idx + 1 }}</div>
                             <!-- Seasons -->
                             <div class="flex items-center gap-2">
-                              <span class="text-zinc-500 uppercase text-[9px] font-bold">Seasons:</span>
-                              <span class="text-white font-extrabold">{{ watchedItem.seasonsWatched }}/{{ watchedItem.show.number_of_seasons }}</span>
-                              <div class="flex items-center gap-0.5">
+                              <span class="text-zinc-500 uppercase text-[10px] md:text-[9px] font-bold">Seasons:</span>
+                              <span class="text-white font-extrabold text-sm md:text-xs">{{ watchedItem.seasonsWatched }}/{{ watchedItem.show.number_of_seasons }}</span>
+                              <div class="flex items-center gap-1 md:gap-0.5">
                                 @if (watchedItem.seasonsWatched > 1) {
-                                  <button (click)="changeSeason(watchedItem, -1)" class="p-1 rounded bg-white/5 text-zinc-400 hover:text-white transition-all">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                                  <button (click)="changeSeason(watchedItem, -1)" class="p-2.5 md:p-1 rounded bg-white/5 text-zinc-400 hover:text-white transition-all">
+                                    <svg class="w-4 h-4 md:w-3 md:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
                                   </button>
                                 }
                                 @if (watchedItem.seasonsWatched < watchedItem.show.number_of_seasons) {
-                                  <button (click)="changeSeason(watchedItem, 1)" class="p-1 rounded bg-white/5 text-zinc-300 hover:text-white transition-all">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                  <button (click)="changeSeason(watchedItem, 1)" class="p-2.5 md:p-1 rounded bg-white/5 text-zinc-300 hover:text-white transition-all">
+                                    <svg class="w-4 h-4 md:w-3 md:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                                   </button>
                                 }
                               </div>
@@ -288,18 +288,18 @@ import { TrendingComponent } from './components/trending/trending.component';
                             
                             <!-- Rating -->
                             <div class="flex items-center gap-1.5">
-                              <span class="text-zinc-500 uppercase text-[9px] font-bold">Rating:</span>
-                              <select [ngModel]="watchedItem.userRating" (ngModelChange)="setUserRating(watchedItem, +$event)" class="bg-zinc-800 border border-white/10 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer">
+                              <span class="text-zinc-500 uppercase text-[10px] md:text-[9px] font-bold">Rating:</span>
+                              <select [ngModel]="watchedItem.userRating" (ngModelChange)="setUserRating(watchedItem, +$event)" class="bg-zinc-800 border border-white/10 rounded px-3 py-2 md:px-1.5 md:py-0.5 text-sm md:text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer">
                                 <option [ngValue]="0">--</option>
                                 @for (n of ratingOptions; track n) {
                                   <option [ngValue]="n">{{ n }}</option>
                                 }
                               </select>
                             </div>
-
+ 
                             <!-- Delete -->
-                            <button (click)="removeShow(watchedItem.instanceId); (getShowInstances(activeShowForDetails()!.id).length === 0 ? closeDetailsModal() : null)" class="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0" title="Delete copy">
-                              <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <button (click)="removeShow(watchedItem.instanceId); (getShowInstances(activeShowForDetails()!.id).length === 0 ? closeDetailsModal() : null)" class="p-3 md:p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0" title="Delete copy">
+                              <svg class="w-5 h-5 md:w-4.5 md:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                             </button>
                           </div>
                         }
