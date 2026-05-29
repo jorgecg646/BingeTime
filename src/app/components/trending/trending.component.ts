@@ -1,6 +1,7 @@
-import { Component, input, output } from '@angular/core';
+import { Component, inject, signal, OnInit, output } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { TVShow } from '../../models';
+import { TvmazeService } from '../../services/tvmaze.service';
 
 @Component({
   selector: 'app-trending',
@@ -11,7 +12,7 @@ import { TVShow } from '../../models';
       <div class="mt-14 animate-fade-in">
         <div class="flex items-baseline justify-between mb-6 border-b border-white/5 pb-2">
           <h2 class="text-2xl font-bold tracking-tight text-white">Trending on BingeTime</h2>
-          <span class="text-xs text-zinc-500 font-medium">Popular shows</span>
+          <span class="text-xs text-zinc-400 font-medium">Popular shows</span>
         </div>
         <div class="flex gap-4 overflow-x-auto pb-4 scroll-smooth snap-x snap-mandatory no-scrollbar">
           @for (show of trendingShows(); track show.id) {
@@ -26,7 +27,7 @@ import { TVShow } from '../../models';
                 }
               </div>
               <h3 class="font-semibold text-white text-sm truncate group-hover:text-blue-400 transition-colors">{{ show.name }}</h3>
-              <p class="text-xs text-zinc-500 mt-1">{{ show.first_air_date | slice:0:4 }}</p>
+              <p class="text-xs text-zinc-400 mt-1">{{ show.first_air_date | slice:0:4 }}</p>
             </div>
           }
         </div>
@@ -34,8 +35,15 @@ import { TVShow } from '../../models';
     }
   `
 })
-export class TrendingComponent {
-  trendingShows = input.required<TVShow[]>();
+export class TrendingComponent implements OnInit {
+  private tvmaze = inject(TvmazeService);
+  trendingShows = signal<TVShow[]>([]);
   
   openDetails = output<TVShow>();
+
+  ngOnInit(): void {
+    this.tvmaze.getPopularShows().subscribe(shows => {
+      this.trendingShows.set(shows);
+    });
+  }
 }

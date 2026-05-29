@@ -138,33 +138,34 @@ import { TrendingComponent } from './components/trending/trending.component';
         } @else {
           <div class="text-center py-16">
             <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl glass mb-5">
-              <svg class="w-8 h-8 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-8 h-8 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
               </svg>
             </div>
-            <h3 class="text-lg font-medium text-zinc-300 mb-2">No shows yet</h3>
-            <p class="text-zinc-600 text-sm">Search or choose a trending show below to get started</p>
+            <h2 class="text-lg font-semibold text-zinc-200 mb-2">No shows yet</h2>
+            <p class="text-zinc-400 text-sm">Search or choose a trending show below to get started</p>
           </div>
         }
 
         <!-- Trending Section -->
-        <app-trending 
-          [trendingShows]="trendingShows()" 
-          (openDetails)="openDetails($event)">
-        </app-trending>
+        @defer (on idle) {
+          <app-trending 
+            (openDetails)="openDetails($event)">
+          </app-trending>
+        }
       </main>
 
       <!-- Footer -->
       <footer class="py-8 border-t border-white/5 mt-auto relative z-10">
         <div class="container mx-auto px-4 md:px-8 max-w-[1600px]">
           <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-            <div class="flex items-center gap-4 text-zinc-600">
+            <div class="flex items-center gap-4 text-zinc-400">
               <span>Data from</span>
               <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" class="text-zinc-400 hover:text-white transition-colors">TVMaze</a>
             </div>
-            <button (click)="resetAll()" class="text-zinc-600 hover:text-red-400 transition-colors text-sm">Reset data</button>
+            <button (click)="resetAll()" class="text-zinc-400 hover:text-red-400 transition-colors text-sm">Reset data</button>
           </div>
-          <div class="mt-6 text-center text-zinc-700 text-xs">
+          <div class="mt-6 text-center text-zinc-500 text-xs">
             <p>Calculate the time you have spent watching your favorite shows</p>
           </div>
         </div>
@@ -322,7 +323,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private tvmaze = inject(TvmazeService);
 
   watchedShows = signal<WatchedShow[]>(this.loadFromStorage());
-  trendingShows = signal<TVShow[]>([]);
   activeShowForDetails = signal<TVShow | null>(null);
 
   searchQuery = '';
@@ -400,13 +400,6 @@ export class AppComponent implements OnInit, OnDestroy {
       this.bgImage1.set(images[0]);
     }
     this.startBgSlideshow();
-    this.loadTrendingShows();
-  }
-
-  loadTrendingShows() {
-    this.tvmaze.getPopularShows().subscribe(shows => {
-      this.trendingShows.set(shows);
-    });
   }
 
   openDetails(show: TVShow): void {
