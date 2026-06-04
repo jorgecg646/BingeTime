@@ -8,6 +8,7 @@ export interface TVShow {
   rating: number | null;
   seasons: Season[];
   summary?: string;
+  genres?: string[];
 }
 
 export interface Season {
@@ -22,4 +23,10 @@ export interface WatchedShow {
   totalMinutes: number;
   episodesWatched: number;
   userRating: number;
+}
+
+export interface PendingShow {
+  id: string;
+  show: TVShow;
+  addedAt: number;
 }
