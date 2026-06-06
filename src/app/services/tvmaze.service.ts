@@ -9,6 +9,13 @@ export class TvmazeService {
   private baseUrl = 'https://api.tvmaze.com';
   private topRatedShowsCache: TVShow[] | null = null;
 
+  /**
+   * Searches for TV shows by query string.
+   * If the initial search returns no results, retries by removing the last word
+   * (handles incomplete/partial typing). Results are sorted by relevance.
+   * @param query - The search term entered by the user.
+   * @returns An observable emitting an array of up to 8 matching TVShow results.
+   */
   searchShows(query: string): Observable<TVShow[]> {
     const trimmed = query.trim();
     return this.http.get<any[]>(`${this.baseUrl}/search/shows?q=${encodeURIComponent(trimmed)}`).pipe(
@@ -30,24 +37,14 @@ export class TvmazeService {
     );
   }
 
-  searchAllShows(query: string): Observable<TVShow[]> {
-    const trimmed = query.trim();
-    return this.http.get<any[]>(`${this.baseUrl}/search/shows?q=${encodeURIComponent(trimmed)}`).pipe(
-      switchMap(results => {
-        if (results.length > 0) return of(this.processResults(results, trimmed, 50));
-        const words = trimmed.split(/\s+/);
-        if (words.length > 1) {
-          const fallback = words.slice(0, -1).join(' ');
-          return this.http.get<any[]>(`${this.baseUrl}/search/shows?q=${encodeURIComponent(fallback)}`).pipe(
-            map(r => this.processResults(r, trimmed, 50))
-          );
-        }
-        return of([]);
-      }),
-      catchError(() => of([]))
-    );
-  }
-
+  /**
+   * Sorts and ranks search results by relevance to the query.
+   * Priority order: name starts with query > contains all words > contains full query > TVMaze score.
+   * @param results - Raw API results from TVMaze search endpoint.
+   * @param query - The original search query for relevance comparison.
+   * @param limit - Maximum number of results to return (default: 8).
+   * @returns A sorted and limited array of TVShow objects.
+   */
   private processResults(results: any[], query: string, limit = 8): TVShow[] {
     const q = query.toLowerCase();
     const words = q.split(/\s+/);
@@ -58,25 +55,27 @@ export class TvmazeService {
         name: (item.show.name as string).toLowerCase()
       }))
       .sort((a, b) => {
-        // 1st: name starts with full query
         const aStarts = a.name.startsWith(q) ? 0 : 1;
         const bStarts = b.name.startsWith(q) ? 0 : 1;
         if (aStarts !== bStarts) return aStarts - bStarts;
-        // 2nd: name contains all typed words
         const aAll = words.every(w => a.name.includes(w)) ? 0 : 1;
         const bAll = words.every(w => b.name.includes(w)) ? 0 : 1;
         if (aAll !== bAll) return aAll - bAll;
-        // 3rd: name contains the full query string
         const aContains = a.name.includes(q) ? 0 : 1;
         const bContains = b.name.includes(q) ? 0 : 1;
         if (aContains !== bContains) return aContains - bContains;
-        // 4th: TVMaze relevance score
         return b.score - a.score;
       })
       .slice(0, limit)
       .map(item => item.show);
   }
 
+  /**
+   * Fetches full details for a single show, including its seasons.
+   * Combines the show details and seasons API calls into a single response.
+   * @param showId - The TVMaze show ID.
+   * @returns An observable emitting the enriched TVShow or null on error.
+   */
   getShowDetails(showId: number): Observable<TVShow | null> {
     return forkJoin({
       details: this.http.get<any>(`${this.baseUrl}/shows/${showId}`),
@@ -96,22 +95,11 @@ export class TvmazeService {
     );
   }
 
-
-  getPopularShows(): Observable<TVShow[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/shows?page=0`).pipe(
-      map(shows => {
-        if (!Array.isArray(shows)) return [];
-        // Sort by weight descending to get the most popular shows on the page
-        return shows
-          .filter(show => show.image?.medium)
-          .sort((a, b) => (b.weight || 0) - (a.weight || 0))
-          .slice(0, 15)
-          .map(show => this.mapShow(show));
-      }),
-      catchError(() => of([]))
-    );
-  }
-
+  /**
+   * Fetches the top-rated shows from TVMaze (pages 0 and 1).
+   * Results are cached in memory after the first load to avoid redundant API calls.
+   * @returns An observable emitting up to 250 TVShow objects sorted by rating descending.
+   */
   getTopRatedShows(): Observable<TVShow[]> {
     if (this.topRatedShowsCache) {
       return of(this.topRatedShowsCache);
@@ -135,6 +123,39 @@ export class TvmazeService {
     );
   }
 
+  /**
+   * Fetches recently updated show IDs and their timestamps from TVMaze.
+   * Used to detect new seasons for shows in the user's watchlist.
+   * @returns An observable emitting a record mapping show ID strings to Unix timestamps.
+   */
+  getShowUpdates(): Observable<Record<string, number>> {
+    return this.http.get<Record<string, number>>(`${this.baseUrl}/updates/shows?since=day`).pipe(
+      catchError(() => of({}))
+    );
+  }
+
+  /**
+   * Fetches all seasons for a specific show.
+   * Filters out specials (season number <= 0).
+   * @param showId - The TVMaze show ID.
+   * @returns An observable emitting an array of Season objects.
+   */
+  getShowSeasons(showId: number): Observable<Season[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/shows/${showId}/seasons`).pipe(
+      map(seasons => seasons
+        .filter((s: any) => s.number > 0)
+        .map((s: any) => ({ season_number: s.number, episode_count: s.episodeOrder || 10 }))
+      ),
+      catchError(() => of([]))
+    );
+  }
+
+  /**
+   * Maps a raw TVMaze API show object to the internal TVShow model.
+   * Provides sensible defaults for missing fields.
+   * @param show - Raw show object from the TVMaze API.
+   * @returns A normalized TVShow object.
+   */
   private mapShow(show: any): TVShow {
     return {
       id: show.id,

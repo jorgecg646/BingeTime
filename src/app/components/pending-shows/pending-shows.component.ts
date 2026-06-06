@@ -2,6 +2,11 @@ import { Component, input, output } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { PendingShow, TVShow } from '../../models';
 
+/**
+ * Displays the user's pending/to-watch shows in a poster grid.
+ * Each poster shows a hover overlay with the show name, rating,
+ * and buttons to mark as watched or remove from pending.
+ */
 @Component({
   selector: 'app-pending-shows',
   standalone: true,
@@ -33,9 +38,8 @@ import { PendingShow, TVShow } from '../../models';
               }
 
               <!-- Pending badge (hidden on hover) -->
-              <div class="absolute top-2 left-2 z-10 px-1.5 py-0.5 rounded-md bg-violet-600/80 backdrop-blur-sm text-white text-[9px] font-bold pointer-events-none flex items-center gap-1 group-hover:opacity-0 transition-opacity duration-200">
-                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                Pending
+              <div class="absolute top-2 left-2 z-10 w-7 h-7 bg-violet-600/95 text-white rounded-full flex items-center justify-center border border-violet-500/30 backdrop-blur-sm shadow-lg pointer-events-none group-hover:opacity-0 transition-opacity duration-200" title="Pending">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               </div>
 
               <!-- Delete Button (always visible, hidden on hover to avoid conflict) -->
@@ -90,9 +94,13 @@ import { PendingShow, TVShow } from '../../models';
   `
 })
 export class PendingShowsComponent {
+  /** The list of pending shows to display. */
   pendingShows = input.required<PendingShow[]>();
 
+  /** Emits when the user clicks a show to view its details. */
   openDetails = output<TVShow>();
+  /** Emits the pending entry ID when the user removes a show from pending. */
   removePending = output<string>();
+  /** Emits the pending entry when the user wants to mark it as watched. */
   markAsWatched = output<PendingShow>();
 }

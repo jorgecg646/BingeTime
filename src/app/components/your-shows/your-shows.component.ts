@@ -1,8 +1,15 @@
-import { Component, input, output, signal, computed } from '@angular/core';
+import { Component, input, output, signal, computed, inject } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WatchedShow, TVShow } from '../../models';
+import { ShowStateService } from '../../services/show-state.service';
 
+/**
+ * Displays the user's watched shows in a responsive poster grid.
+ * Each poster reveals an interactive overlay on hover with show details,
+ * season controls, rating selector, and delete option.
+ * Collapses to a compact view when there are more than 6 shows.
+ */
 @Component({
   selector: 'app-your-shows',
   standalone: true,
@@ -23,6 +30,13 @@ import { WatchedShow, TVShow } from '../../models';
               <div class="relative aspect-[2/3] overflow-hidden group animate-slide-up" [style.animation-delay]="i * 50 + 'ms'">
                 <!-- Poster Image -->
                 <img [src]="item.show.poster_path" [alt]="item.show.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                
+                <!-- New season notification badge -->
+                @if (state.hasNewSeasonAlert(item.show.id)) {
+                  <div class="absolute top-2 left-2 z-20 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-black text-[9px] font-black animate-pulse shadow-lg border-2 border-amber-400" title="New season available!">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                  </div>
+                }
                 
                 <!-- Golden Circular Delete Button (Always visible) -->
                 <button (click)="removeShow.emit(item.instanceId); $event.stopPropagation()" 
@@ -130,18 +144,34 @@ import { WatchedShow, TVShow } from '../../models';
   `
 })
 export class YourShowsComponent {
+  state = inject(ShowStateService);
+
+  /** The list of watched shows to display. */
   watchedShows = input.required<WatchedShow[]>();
   
+  /** Emits when the user clicks a show to view its details. */
   openDetails = output<TVShow>();
+  /** Emits when the user changes the number of watched seasons. */
   changeSeason = output<{ item: WatchedShow; delta: number }>();
+  /** Emits the instanceId of a show the user wants to remove. */
   removeShow = output<string>();
+  /** Emits when the user sets a personal rating for a show. */
   setUserRating = output<{ item: WatchedShow; rating: number }>();
 
+  /** Available rating values for the user rating dropdown (1-10). */
   ratingOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  /** Whether the full grid is expanded (vs. collapsed with blur overlay). */
   isExpanded = signal(false);
   
+  /** Whether to show the expand/collapse toggle (only when more than 6 shows). */
   showCollapseControls = computed(() => this.watchedShows().length > 6);
 
+  /**
+   * Formats a minute count into a human-readable duration string.
+   * Shows days+hours, hours+minutes, or minutes only as appropriate.
+   * @param minutes - Total minutes to format.
+   * @returns A compact string like "3d 5h", "2h 30m", or "45m".
+   */
   formatTime(minutes: number): string {
     const d = Math.floor(minutes / 1440);
     const h = Math.floor((minutes % 1440) / 60);

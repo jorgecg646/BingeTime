@@ -1,5 +1,10 @@
 import { Component, input } from '@angular/core';
 
+/**
+ * Displays the total watch time counter with days, hours, and minutes,
+ * plus summary stats for episodes and shows watched.
+ * Each digit animates individually with a pop effect on value change.
+ */
 @Component({
   selector: 'app-counter',
   standalone: true,
@@ -55,9 +60,14 @@ import { Component, input } from '@angular/core';
   `
 })
 export class CounterComponent {
+  /** Days portion of total watch time, zero-padded (e.g. "03"). */
   days = input.required<string>();
+  /** Hours portion of total watch time, zero-padded (e.g. "14"). */
   hours = input.required<string>();
+  /** Minutes portion of total watch time, zero-padded (e.g. "07"). */
   minutes = input.required<string>();
+  /** Total number of episodes watched across all shows. */
   totalEpisodes = input.required<number>();
+  /** Total number of unique shows in the watchlist. */
   watchedShowsCount = input.required<number>();
 }
