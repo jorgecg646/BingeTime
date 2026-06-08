@@ -12,21 +12,43 @@ const getSupabaseClient = () => {
 
   // If Netlify integration only created SUPABASE_DATABASE_URL, extract the REST URL from it
   if (!supabaseUrl && process.env.SUPABASE_DATABASE_URL) {
-    // 1. Try matching direct connection format: db.projectref.supabase.co
-    const matchHost = process.env.SUPABASE_DATABASE_URL.match(/db\.([a-z0-9]{20})\.supabase/i);
-    if (matchHost && matchHost[1]) {
-      supabaseUrl = `https://${matchHost[1]}.supabase.co`;
-    } else {
-      // 2. Try matching connection pooling / transaction pooler format: postgres.projectref
-      const matchUser = process.env.SUPABASE_DATABASE_URL.match(/postgres\.([a-z0-9]{20})/i);
-      if (matchUser && matchUser[1]) {
-        supabaseUrl = `https://${matchUser[1]}.supabase.co`;
+    try {
+      // Normalize protocol for URL parser
+      const normalizedUrl = process.env.SUPABASE_DATABASE_URL
+        .replace('postgresql://', 'http://')
+        .replace('postgres://', 'http://');
+      
+      const parsed = new URL(normalizedUrl);
+      const host = parsed.hostname || '';
+      const user = parsed.username || '';
+
+      // 1. Search for a 20-character alphanumeric project reference in the hostname (e.g. db.projectref.supabase.co)
+      const matchHost = host.match(/([a-z0-9]{20})/i);
+      if (matchHost) {
+        supabaseUrl = `https://${matchHost[1]}.supabase.co`;
+      } else {
+        // 2. Search for a 20-character alphanumeric project reference in the username (e.g. postgres.projectref)
+        const matchUser = user.match(/([a-z0-9]{20})/i);
+        if (matchUser) {
+          supabaseUrl = `https://${matchUser[1]}.supabase.co`;
+        }
+      }
+    } catch (e) {
+      // Fallback: simple search for any 20-character alphanumeric string in the raw URL
+      const matchFallback = process.env.SUPABASE_DATABASE_URL.match(/([a-z0-9]{20})/i);
+      if (matchFallback) {
+        supabaseUrl = `https://${matchFallback[1]}.supabase.co`;
       }
     }
   }
 
   if (!supabaseUrl || !supabaseServiceKey) {
-    throw new Error(`Missing Supabase credentials. URL: ${supabaseUrl ? 'OK' : 'MISSING'}, Service Key: ${supabaseServiceKey ? 'OK' : 'MISSING'}`);
+    // Safely mask the database URL password for debugging purposes
+    const maskedDbUrl = process.env.SUPABASE_DATABASE_URL 
+      ? process.env.SUPABASE_DATABASE_URL.replace(/:[^:@]+@/, ':XXXXX@') 
+      : 'NOT_SET';
+    
+    throw new Error(`Missing Supabase credentials. URL: ${supabaseUrl ? 'OK' : 'MISSING'}, Service Key: ${supabaseServiceKey ? 'OK' : 'MISSING'}. Debug DB URL: ${maskedDbUrl}`);
   }
 
   supabase = createClient(supabaseUrl, supabaseServiceKey);
