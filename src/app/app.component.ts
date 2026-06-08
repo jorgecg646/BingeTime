@@ -4,11 +4,12 @@ import { ShowStateService } from './services/show-state.service';
 import { ShowDetailsModalComponent } from './components/show-details-modal/show-details-modal.component';
 import { SearchComponent } from './components/search/search.component';
 import { AuthService } from './services/auth.service';
+import { AdsenseComponent } from './components/adsense/adsense.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ShowDetailsModalComponent, SearchComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ShowDetailsModalComponent, SearchComponent, AdsenseComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit, OnDestroy {
