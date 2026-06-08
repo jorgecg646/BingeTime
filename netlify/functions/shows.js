@@ -1,18 +1,37 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// Read database config from environment variables securely in the serverless environment
-let supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let supabase;
 
-// If Netlify integration only created SUPABASE_DATABASE_URL, extract the REST URL from it
-if (!supabaseUrl && process.env.SUPABASE_DATABASE_URL) {
-  const match = process.env.SUPABASE_DATABASE_URL.match(/db\.(.+?)\.supabase/);
-  if (match && match[1]) {
-    supabaseUrl = `https://${match[1]}.supabase.co`;
+// Lazy initialization function to prevent top-level initialization crashes (502 Bad Gateway)
+// and dynamically parse the REST URL from PostgreSQL pooler strings if needed.
+const getSupabaseClient = () => {
+  if (supabase) return supabase;
+
+  let supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // If Netlify integration only created SUPABASE_DATABASE_URL, extract the REST URL from it
+  if (!supabaseUrl && process.env.SUPABASE_DATABASE_URL) {
+    // 1. Try matching direct connection format: db.projectref.supabase.co
+    const matchHost = process.env.SUPABASE_DATABASE_URL.match(/db\.([a-z0-9]{20})\.supabase/i);
+    if (matchHost && matchHost[1]) {
+      supabaseUrl = `https://${matchHost[1]}.supabase.co`;
+    } else {
+      // 2. Try matching connection pooling / transaction pooler format: postgres.projectref
+      const matchUser = process.env.SUPABASE_DATABASE_URL.match(/postgres\.([a-z0-9]{20})/i);
+      if (matchUser && matchUser[1]) {
+        supabaseUrl = `https://${matchUser[1]}.supabase.co`;
+      }
+    }
   }
-}
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error(`Missing Supabase credentials. URL: ${supabaseUrl ? 'OK' : 'MISSING'}, Service Key: ${supabaseServiceKey ? 'OK' : 'MISSING'}`);
+  }
+
+  supabase = createClient(supabaseUrl, supabaseServiceKey);
+  return supabase;
+};
 
 // Helper function to return JSON responses with correct CORS headers
 const sendResponse = (statusCode, bodyObj) => {
@@ -54,15 +73,17 @@ exports.handler = async (event, context) => {
   const userId = user.sub; // Netlify user UUID
 
   try {
+    const db = getSupabaseClient();
+
     if (method === 'GET') {
       // Fetch both watched and pending shows for the user
       const [watchedRes, pendingRes] = await Promise.all([
-        supabase
+        db
           .from('watched_shows')
           .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false }),
-        supabase
+        db
           .from('pending_shows')
           .select('*')
           .eq('user_id', userId)
@@ -95,12 +116,12 @@ exports.handler = async (event, context) => {
 
       // Handle full user data reset
       if (body.action === 'reset') {
-        const deleteWatched = supabase
+        const deleteWatched = db
           .from('watched_shows')
           .delete()
           .eq('user_id', userId);
 
-        const deletePending = supabase
+        const deletePending = db
           .from('pending_shows')
           .delete()
           .eq('user_id', userId);
@@ -115,7 +136,7 @@ exports.handler = async (event, context) => {
       // Handle single upsert of watched or pending show
       const { type, item } = body;
       if (type === 'watched') {
-        const { error } = await supabase
+        const { error } = await db
           .from('watched_shows')
           .upsert({
             user_id: userId,
@@ -132,7 +153,7 @@ exports.handler = async (event, context) => {
 
         if (error) throw error;
       } else if (type === 'pending') {
-        const { error } = await supabase
+        const { error } = await db
           .from('pending_shows')
           .upsert({
             user_id: userId,
@@ -156,7 +177,7 @@ exports.handler = async (event, context) => {
 
       // Handle single deletions
       if (type === 'watched') {
-        const { error } = await supabase
+        const { error } = await db
           .from('watched_shows')
           .delete()
           .eq('user_id', userId)
@@ -164,7 +185,7 @@ exports.handler = async (event, context) => {
 
         if (error) throw error;
       } else if (type === 'pending') {
-        const { error } = await supabase
+        const { error } = await db
           .from('pending_shows')
           .delete()
           .eq('user_id', userId)
