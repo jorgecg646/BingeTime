@@ -1,13 +1,17 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Injectable, signal, computed, inject, effect } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { TVShow, WatchedShow, PendingShow, NewSeasonAlert } from '../models';
 import { TvmazeService } from './tvmaze.service';
+import { AuthService } from './auth.service';
+import { SupabaseService } from './supabase.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ShowStateService {
   private tvmaze = inject(TvmazeService);
+  private auth = inject(AuthService);
+  private supabaseService = inject(SupabaseService);
 
   /** Reactive list of all shows the user has watched. Persisted in localStorage. */
   watchedShows = signal<WatchedShow[]>(this.loadFromStorage());
@@ -25,6 +29,52 @@ export class ShowStateService {
   selectedShow = signal<TVShow | null>(null);
   /** Number of seasons selected in the season-picker modal. */
   seasonsToAdd = signal<number>(0);
+
+  constructor() {
+    // Listen for authentication changes to synchronize shows
+    effect(() => {
+      const user = this.auth.user();
+      if (user) {
+        this.loadUserDataFromSupabase(user.id);
+      } else {
+        this.watchedShows.set(this.loadFromStorage());
+        this.pendingShows.set(this.loadPendingFromStorage());
+      }
+    });
+  }
+
+  private async loadUserDataFromSupabase(userId: string) {
+    try {
+      const [remoteWatched, remotePending] = await Promise.all([
+        this.supabaseService.getWatchedShows(userId),
+        this.supabaseService.getPendingShows(userId)
+      ]);
+
+      const localWatched = this.loadFromStorage();
+      const localPending = this.loadPendingFromStorage();
+
+      // Sincronizar datos locales iniciales con Supabase si está vacío en la nube
+      if (remoteWatched.length === 0 && localWatched.length > 0) {
+        for (const item of localWatched) {
+          await this.supabaseService.upsertWatchedShow(userId, item);
+        }
+        this.watchedShows.set(localWatched);
+      } else {
+        this.watchedShows.set(remoteWatched);
+      }
+
+      if (remotePending.length === 0 && localPending.length > 0) {
+        for (const item of localPending) {
+          await this.supabaseService.upsertPendingShow(userId, item);
+        }
+        this.pendingShows.set(localPending);
+      } else {
+        this.pendingShows.set(remotePending);
+      }
+    } catch (err) {
+      console.error('Error loading user data from Supabase:', err);
+    }
+  }
 
   /**
    * Opens the details modal for a show.
@@ -150,7 +200,15 @@ export class ShowStateService {
     };
     this.watchedShows.update(list => [newInstance, ...list]);
     this.removePending(show.id);
-    this.save();
+
+    const user = this.auth.user();
+    if (user) {
+      this.supabaseService.upsertWatchedShow(user.id, newInstance).catch(err => {
+        console.error('Error saving show to Supabase:', err);
+      });
+    } else {
+      this.save();
+    }
   }
 
   /**
@@ -163,10 +221,24 @@ export class ShowStateService {
     const newSeasons = item.seasonsWatched + delta;
     if (newSeasons < 1 || newSeasons > item.show.number_of_seasons) return;
     const t = this.calculateTime(item.show, newSeasons);
-    this.watchedShows.update(list => list.map(w =>
-      w.instanceId === item.instanceId ? { ...w, seasonsWatched: newSeasons, totalMinutes: t.minutes, episodesWatched: t.episodes } : w
-    ));
-    this.save();
+
+    let updatedItem: WatchedShow | null = null;
+    this.watchedShows.update(list => list.map(w => {
+      if (w.instanceId === item.instanceId) {
+        updatedItem = { ...w, seasonsWatched: newSeasons, totalMinutes: t.minutes, episodesWatched: t.episodes };
+        return updatedItem;
+      }
+      return w;
+    }));
+
+    const user = this.auth.user();
+    if (user && updatedItem) {
+      this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err => {
+        console.error('Error updating seasons in Supabase:', err);
+      });
+    } else {
+      this.save();
+    }
   }
 
   /**
@@ -175,7 +247,15 @@ export class ShowStateService {
    */
   removeShow(instanceId: string): void {
     this.watchedShows.update(list => list.filter(w => w.instanceId !== instanceId));
-    this.save();
+
+    const user = this.auth.user();
+    if (user) {
+      this.supabaseService.deleteWatchedShow(user.id, instanceId).catch(err => {
+        console.error('Error deleting show from Supabase:', err);
+      });
+    } else {
+      this.save();
+    }
   }
 
   /**
@@ -184,10 +264,23 @@ export class ShowStateService {
    * @param rating - The rating value (1-10).
    */
   setUserRating(item: WatchedShow, rating: number): void {
-    this.watchedShows.update(list => list.map(w =>
-      w.instanceId === item.instanceId ? { ...w, userRating: rating } : w
-    ));
-    this.save();
+    let updatedItem: WatchedShow | null = null;
+    this.watchedShows.update(list => list.map(w => {
+      if (w.instanceId === item.instanceId) {
+        updatedItem = { ...w, userRating: rating };
+        return updatedItem;
+      }
+      return w;
+    }));
+
+    const user = this.auth.user();
+    if (user && updatedItem) {
+      this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err => {
+        console.error('Error saving rating to Supabase:', err);
+      });
+    } else {
+      this.save();
+    }
   }
 
   /**
@@ -203,7 +296,15 @@ export class ShowStateService {
       addedAt: Date.now()
     };
     this.pendingShows.update(list => [entry, ...list]);
-    this.savePending();
+
+    const user = this.auth.user();
+    if (user) {
+      this.supabaseService.upsertPendingShow(user.id, entry).catch(err => {
+        console.error('Error saving pending show to Supabase:', err);
+      });
+    } else {
+      this.savePending();
+    }
   }
 
   /**
@@ -213,8 +314,25 @@ export class ShowStateService {
    */
   removePending(id: string | number): void {
     const isNum = typeof id === 'number';
+    let pendingIdToDelete: string | null = null;
+
+    if (isNum) {
+      const found = this.pendingShows().find(p => p.show.id === id);
+      if (found) pendingIdToDelete = found.id;
+    } else {
+      pendingIdToDelete = id as string;
+    }
+
     this.pendingShows.update(list => list.filter(p => isNum ? p.show.id !== id : p.id !== id));
-    this.savePending();
+
+    const user = this.auth.user();
+    if (user && pendingIdToDelete) {
+      this.supabaseService.deletePendingShow(user.id, pendingIdToDelete).catch(err => {
+        console.error('Error deleting pending show from Supabase:', err);
+      });
+    } else {
+      this.savePending();
+    }
   }
 
   /**

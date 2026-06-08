@@ -1,8 +1,9 @@
 import { Component, signal, computed, inject, effect, OnInit, OnDestroy, HostListener } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute, Router } from '@angular/router';
 import { ShowStateService } from './services/show-state.service';
 import { ShowDetailsModalComponent } from './components/show-details-modal/show-details-modal.component';
 import { SearchComponent } from './components/search/search.component';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -12,6 +13,8 @@ import { SearchComponent } from './components/search/search.component';
 })
 export class AppComponent implements OnInit, OnDestroy {
   state = inject(ShowStateService);
+  auth = inject(AuthService);
+  router = inject(Router);
   private route = inject(ActivatedRoute);
 
   /** Controls whether the floating navigation bar is visible (hides on scroll down). */
@@ -95,6 +98,12 @@ export class AppComponent implements OnInit, OnDestroy {
    * for shareable show links, and triggers the daily new-season check.
    */
   ngOnInit() {
+    // Check if we are handling an external login callback
+    const handled = this.auth.handleExternalLogin();
+    if (handled) {
+      this.router.navigate(['/']);
+    }
+
     const images = this.bgImages();
     if (images.length > 0) {
       this.bgImage1.set(images[0]);

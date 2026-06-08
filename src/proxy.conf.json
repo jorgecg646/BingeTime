@@ -1,0 +1,14 @@
+{
+  "/.netlify/identity": {
+    "target": "https://bingetimes.netlify.app",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/api": {
+    "target": "https://bingetimes.netlify.app",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

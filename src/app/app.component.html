@@ -34,59 +34,93 @@
   </div>
 
   <!-- Header -->
-  <header class="pt-20 pb-10 text-center relative z-10">
-    <div class="relative animate-fade-in">
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass mb-8 text-sm text-zinc-300">
-        <span class="relative flex h-2 w-2">
-          <span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
-          <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-        </span>
-        TV-Show time calculator
+  @if (!router.url.includes('/auth')) {
+    <header class="pt-20 pb-10 text-center relative z-10">
+      <div class="relative animate-fade-in">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass mb-8 text-sm text-zinc-300">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+          </span>
+          TV-Show time calculator
+        </div>
+        <h1 class="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter mb-6 text-balance">
+          <span class="gradient-text">BingeTime</span>
+        </h1>
+        <p class="text-zinc-400 text-lg md:text-xl max-w-lg mx-auto px-4 leading-relaxed text-pretty">
+          Discover how much time you have spent watching your favorite shows
+        </p>
       </div>
-      <h1 class="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter mb-6 text-balance">
-        <span class="gradient-text">BingeTime</span>
-      </h1>
-      <p class="text-zinc-400 text-lg md:text-xl max-w-lg mx-auto px-4 leading-relaxed text-pretty">
-        Discover how much time you have spent watching your favorite shows
-      </p>
+    </header>
+
+    <!-- Route Navigation Links -->
+    <div 
+      [class]="'sticky top-0 z-40 w-full mb-4 px-4 flex justify-center items-center gap-4 flex-wrap transition-all duration-300 ease-out ' + 
+               (isNavVisible() ? 'translate-y-0' : '-translate-y-32') + ' ' + 
+               (isScrolled() ? 'bg-slate-950/80 backdrop-blur-xl border-b border-white/10 shadow-2xl py-4' : 'py-2')"
+    >
+      <a routerLink="/discover" routerLinkActive="bg-white/10 text-white border-white/20" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass">Discover</a>
+      <a routerLink="/" routerLinkActive="bg-white/10 text-white border-white/20" [routerLinkActiveOptions]="{exact: true}" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass flex items-center gap-2">Your Shows <span class="px-1.5 py-0.5 rounded-md bg-blue-600 text-white text-xs font-bold">{{ state.watchedShows().length }}</span></a>
+      <a routerLink="/top-series" routerLinkActive="bg-white/10 text-white border-white/20" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass">Top 250</a>
     </div>
-  </header>
 
-  <!-- Route Navigation Links -->
-  <div 
-    [class]="'sticky top-0 z-40 w-full mb-4 px-4 flex justify-center gap-4 flex-wrap transition-all duration-300 ease-out ' + 
-             (isNavVisible() ? 'translate-y-0' : '-translate-y-32') + ' ' + 
-             (isScrolled() ? 'bg-slate-950/80 backdrop-blur-xl border-b border-white/10 shadow-2xl py-4' : 'py-2')"
-  >
-    <a routerLink="/discover" routerLinkActive="bg-white/10 text-white border-white/20" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass">Discover</a>
-    <a routerLink="/" routerLinkActive="bg-white/10 text-white border-white/20" [routerLinkActiveOptions]="{exact: true}" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass flex items-center gap-2">Your Shows <span class="px-1.5 py-0.5 rounded-md bg-blue-600 text-white text-xs font-bold">{{ state.watchedShows().length }}</span></a>
-    <a routerLink="/top-series" routerLinkActive="bg-white/10 text-white border-white/20" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass">Top 250</a>
-  </div>
+    <!-- Account Button (Absolute top-right, scrolls away with page) -->
+    <div class="absolute top-4 right-4 sm:top-20 sm:right-6 z-50">
+      @if (auth.isLoggedIn()) {
+        <div class="nav-profile hover-lift shadow-lg">
+          @if (auth.avatarUrl()) {
+            <img [src]="auth.avatarUrl()" [alt]="auth.displayName()" class="nav-avatar" />
+          } @else {
+            <div class="nav-avatar-placeholder bg-blue-600/20 text-blue-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+          }
+          <span class="nav-username font-semibold">{{ auth.displayName() }}</span>
+          <button (click)="auth.logout()" class="nav-logout-btn" title="Cerrar sesión">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
+      } @else {
+        <a routerLink="/auth" class="px-4 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass flex items-center gap-2 hover-lift shadow-lg" title="Iniciar sesión / Registrarse">
+          <svg class="w-5 h-5 text-zinc-400 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>Cuenta</span>
+        </a>
+      }
+    </div>
 
-  <!-- Global Search Bar -->
-  <div class="container mx-auto px-4 md:px-8 mb-8 relative z-10 max-w-[1600px]">
-    <app-search></app-search>
-  </div>
+    <!-- Global Search Bar -->
+    <div class="container mx-auto px-4 md:px-8 mb-8 relative z-10 max-w-[1600px]">
+      <app-search></app-search>
+    </div>
+  }
 
   <main class="flex-1 container mx-auto px-4 md:px-8 py-8 max-w-[1600px] relative z-10">
     <router-outlet></router-outlet>
   </main>
 
   <!-- Footer -->
-  <footer class="py-8 border-t border-white/5 mt-auto relative z-10">
-    <div class="container mx-auto px-4 md:px-8 max-w-[1600px]">
-      <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-        <div class="flex items-center gap-4 text-zinc-400">
-          <span>Data from</span>
-          <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" class="text-zinc-400 hover:text-white transition-colors">TVMaze</a>
+  @if (!router.url.includes('/auth')) {
+    <footer class="py-8 border-t border-white/5 mt-auto relative z-10">
+      <div class="container mx-auto px-4 md:px-8 max-w-[1600px]">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
+          <div class="flex items-center gap-4 text-zinc-400">
+            <span>Data from</span>
+            <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" class="text-zinc-400 hover:text-white transition-colors">TVMaze</a>
+          </div>
+          <button (click)="state.resetAll()" class="text-zinc-400 hover:text-red-400 transition-colors text-sm">Reset data</button>
         </div>
-        <button (click)="state.resetAll()" class="text-zinc-400 hover:text-red-400 transition-colors text-sm">Reset data</button>
+        <div class="mt-6 text-center text-zinc-500 text-xs">
+          <p>Calculate the time you have spent watching your favorite shows</p>
+        </div>
       </div>
-      <div class="mt-6 text-center text-zinc-500 text-xs">
-        <p>Calculate the time you have spent watching your favorite shows</p>
-      </div>
-    </div>
-  </footer>
+    </footer>
+  }
 
   <!-- Global Show details modal -->
   <app-show-details-modal
