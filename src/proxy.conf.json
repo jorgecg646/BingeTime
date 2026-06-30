@@ -6,8 +6,8 @@
     "logLevel": "debug"
   },
   "/api": {
-    "target": "https://bingetimes.netlify.app",
-    "secure": true,
+    "target": "http://localhost:8888",
+    "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
   }

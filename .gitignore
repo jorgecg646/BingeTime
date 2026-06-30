@@ -25,6 +25,7 @@ node_modules/
 *.pem
 /src/environments/environment.ts
 /src/environments/environment.prod.ts
+local-api-server.js
 
 # Logs
 logs

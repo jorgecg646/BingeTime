@@ -7,7 +7,7 @@ const targetPath = path.join(__dirname, 'src', 'environments', 'environment.prod
 const devTargetPath = path.join(__dirname, 'src', 'environments', 'environment.ts');
 const devTemplatePath = path.join(__dirname, 'src', 'environments', 'environment.example.ts');
 
-console.log('Running set-env.js to inject production environment variables...');
+console.log('Running set-env.js to generate production environment file...');
 
 // Ensure the directory exists
 const envDir = path.join(__dirname, 'src', 'environments');
@@ -21,28 +21,15 @@ if (!fs.existsSync(devTargetPath)) {
   if (fs.existsSync(devTemplatePath)) {
     fs.copyFileSync(devTemplatePath, devTargetPath);
   } else {
-    fs.writeFileSync(devTargetPath, `export const environment = { production: false, netlifyUrl: '', supabaseUrl: '', supabaseKey: '' };\n`, 'utf8');
+    fs.writeFileSync(devTargetPath, `export const environment = { production: false, netlifyUrl: '' };\n`, 'utf8');
   }
 }
 
-// 2. Read env variables from Netlify build process, supporting native Supabase Integration variables
-const supabaseUrl = process.env.SUPABASE_URL || process.env.SUPABASE_DATABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('WARNING: SUPABASE_URL or SUPABASE_ANON_KEY environment variables are not set.');
-}
-
+// 2. Copy the prod template directly (no variable substitution needed anymore — DB connection is server-side only)
 try {
-  let content = fs.readFileSync(templatePath, 'utf8');
-
-  // Replace placeholder tokens with actual values
-  content = content.replace('SUPABASE_URL_PLACEHOLDER', supabaseUrl);
-  content = content.replace('SUPABASE_KEY_PLACEHOLDER', supabaseKey);
-
-  fs.writeFileSync(targetPath, content, 'utf8');
-  console.log(`Environment variables successfully injected into: ${targetPath}`);
+  fs.copyFileSync(templatePath, targetPath);
+  console.log(`Production environment file generated: ${targetPath}`);
 } catch (error) {
-  console.error('Error modifying environment file:', error);
+  console.error('Error generating environment file:', error);
   process.exit(1);
 }

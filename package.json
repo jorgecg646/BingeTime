@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "ng serve --host 0.0.0.0 --port 3000 --disable-host-check",
+    "dev:api": "node local-api-server.js",
     "build": "node set-env.js && ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
@@ -15,7 +16,7 @@
     "@angular/forms": "^19.0.0",
     "@angular/platform-browser": "^19.0.0",
     "@angular/router": "19.2.25",
-    "@supabase/supabase-js": "^2.108.0",
+    "@neondatabase/serverless": "^0.10.4",
     "gotrue-js": "^1.0.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",

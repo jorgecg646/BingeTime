@@ -1,58 +1,18 @@
-const { createClient } = require('@supabase/supabase-js');
+const { neon } = require('@neondatabase/serverless');
 
-let supabase;
+let sql;
 
-// Lazy initialization function to prevent top-level initialization crashes (502 Bad Gateway)
-// and dynamically parse the REST URL from PostgreSQL pooler strings if needed.
-const getSupabaseClient = () => {
-  if (supabase) return supabase;
+// Lazy initialization to avoid crashes on cold start if env var is missing
+const getDb = () => {
+  if (sql) return sql;
 
-  let supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  // If Netlify integration only created SUPABASE_DATABASE_URL, extract the REST URL from it
-  if (!supabaseUrl && process.env.SUPABASE_DATABASE_URL) {
-    try {
-      // Normalize protocol for URL parser
-      const normalizedUrl = process.env.SUPABASE_DATABASE_URL
-        .replace('postgresql://', 'http://')
-        .replace('postgres://', 'http://');
-      
-      const parsed = new URL(normalizedUrl);
-      const host = parsed.hostname || '';
-      const user = parsed.username || '';
-
-      // 1. Search for a 20-character alphanumeric project reference in the hostname (e.g. db.projectref.supabase.co)
-      const matchHost = host.match(/([a-z0-9]{20})/i);
-      if (matchHost) {
-        supabaseUrl = `https://${matchHost[1]}.supabase.co`;
-      } else {
-        // 2. Search for a 20-character alphanumeric project reference in the username (e.g. postgres.projectref)
-        const matchUser = user.match(/([a-z0-9]{20})/i);
-        if (matchUser) {
-          supabaseUrl = `https://${matchUser[1]}.supabase.co`;
-        }
-      }
-    } catch (e) {
-      // Fallback: simple search for any 20-character alphanumeric string in the raw URL
-      const matchFallback = process.env.SUPABASE_DATABASE_URL.match(/([a-z0-9]{20})/i);
-      if (matchFallback) {
-        supabaseUrl = `https://${matchFallback[1]}.supabase.co`;
-      }
-    }
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('Missing DATABASE_URL environment variable. Set it to your Neon connection string.');
   }
 
-  if (!supabaseUrl || !supabaseServiceKey) {
-    // Safely mask the database URL password for debugging purposes
-    const maskedDbUrl = process.env.SUPABASE_DATABASE_URL 
-      ? process.env.SUPABASE_DATABASE_URL.replace(/:[^:@]+@/, ':XXXXX@') 
-      : 'NOT_SET';
-    
-    throw new Error(`Missing Supabase credentials. URL: ${supabaseUrl ? 'OK' : 'MISSING'}, Service Key: ${supabaseServiceKey ? 'OK' : 'MISSING'}. Debug DB URL: ${maskedDbUrl}`);
-  }
-
-  supabase = createClient(supabaseUrl, supabaseServiceKey);
-  return supabase;
+  sql = neon(databaseUrl);
+  return sql;
 };
 
 // Helper function to return JSON responses with correct CORS headers
@@ -85,7 +45,7 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // 1. Authenticate user via Netlify Identity context
+  // Authenticate user via Netlify Identity context
   // Netlify automatically populates context.clientContext.user when the user sends an Authorization header
   const { user } = context.clientContext || {};
   if (!user) {
@@ -95,27 +55,26 @@ exports.handler = async (event, context) => {
   const userId = user.sub; // Netlify user UUID
 
   try {
-    const db = getSupabaseClient();
+    const db = getDb();
 
     if (method === 'GET') {
       // Fetch both watched and pending shows for the user
-      const [watchedRes, pendingRes] = await Promise.all([
-        db
-          .from('watched_shows')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false }),
-        db
-          .from('pending_shows')
-          .select('*')
-          .eq('user_id', userId)
-          .order('added_at', { ascending: false }),
+      const [watchedRows, pendingRows] = await Promise.all([
+        db`
+          SELECT instance_id, show_data, seasons_watched, total_minutes, episodes_watched, user_rating
+          FROM watched_shows
+          WHERE user_id = ${userId}
+          ORDER BY created_at DESC
+        `,
+        db`
+          SELECT pending_id, show_data, added_at
+          FROM pending_shows
+          WHERE user_id = ${userId}
+          ORDER BY added_at DESC
+        `,
       ]);
 
-      if (watchedRes.error) throw watchedRes.error;
-      if (pendingRes.error) throw pendingRes.error;
-
-      const watched = (watchedRes.data || []).map(row => ({
+      const watched = watchedRows.map(row => ({
         instanceId: row.instance_id,
         show: row.show_data,
         seasonsWatched: row.seasons_watched,
@@ -124,7 +83,7 @@ exports.handler = async (event, context) => {
         userRating: row.user_rating
       }));
 
-      const pending = (pendingRes.data || []).map(row => ({
+      const pending = pendingRows.map(row => ({
         id: row.pending_id,
         show: row.show_data,
         addedAt: Number(row.added_at)
@@ -138,56 +97,52 @@ exports.handler = async (event, context) => {
 
       // Handle full user data reset
       if (body.action === 'reset') {
-        const deleteWatched = db
-          .from('watched_shows')
-          .delete()
-          .eq('user_id', userId);
-
-        const deletePending = db
-          .from('pending_shows')
-          .delete()
-          .eq('user_id', userId);
-
-        const [resW, resP] = await Promise.all([deleteWatched, deletePending]);
-        if (resW.error) throw resW.error;
-        if (resP.error) throw resP.error;
-
+        await Promise.all([
+          db`DELETE FROM watched_shows WHERE user_id = ${userId}`,
+          db`DELETE FROM pending_shows WHERE user_id = ${userId}`,
+        ]);
         return sendResponse(200, { success: true });
       }
 
       // Handle single upsert of watched or pending show
       const { type, item } = body;
+
       if (type === 'watched') {
-        const { error } = await db
-          .from('watched_shows')
-          .upsert({
-            user_id: userId,
-            instance_id: item.instanceId,
-            show_id: item.show.id,
-            show_data: item.show,
-            seasons_watched: item.seasonsWatched,
-            total_minutes: item.totalMinutes,
-            episodes_watched: item.episodesWatched,
-            user_rating: item.userRating
-          }, {
-            onConflict: 'user_id,instance_id'
-          });
-
-        if (error) throw error;
+        const now = new Date().toISOString();
+        await db`
+          INSERT INTO watched_shows (user_id, instance_id, show_id, show_data, seasons_watched, total_minutes, episodes_watched, user_rating, created_at)
+          VALUES (
+            ${userId},
+            ${item.instanceId},
+            ${item.show.id},
+            ${JSON.stringify(item.show)},
+            ${item.seasonsWatched},
+            ${item.totalMinutes},
+            ${item.episodesWatched},
+            ${item.userRating},
+            ${now}
+          )
+          ON CONFLICT (user_id, instance_id) DO UPDATE SET
+            show_data        = EXCLUDED.show_data,
+            seasons_watched  = EXCLUDED.seasons_watched,
+            total_minutes    = EXCLUDED.total_minutes,
+            episodes_watched = EXCLUDED.episodes_watched,
+            user_rating      = EXCLUDED.user_rating
+        `;
       } else if (type === 'pending') {
-        const { error } = await db
-          .from('pending_shows')
-          .upsert({
-            user_id: userId,
-            pending_id: item.id,
-            show_id: item.show.id,
-            show_data: item.show,
-            added_at: item.addedAt
-          }, {
-            onConflict: 'user_id,pending_id'
-          });
-
-        if (error) throw error;
+        await db`
+          INSERT INTO pending_shows (user_id, pending_id, show_id, show_data, added_at)
+          VALUES (
+            ${userId},
+            ${item.id},
+            ${item.show.id},
+            ${JSON.stringify(item.show)},
+            ${item.addedAt}
+          )
+          ON CONFLICT (user_id, pending_id) DO UPDATE SET
+            show_data = EXCLUDED.show_data,
+            added_at  = EXCLUDED.added_at
+        `;
       }
 
       return sendResponse(200, { success: true });
@@ -197,23 +152,16 @@ exports.handler = async (event, context) => {
       const body = JSON.parse(event.body || '{}');
       const { type, instanceId, pendingId } = body;
 
-      // Handle single deletions
       if (type === 'watched') {
-        const { error } = await db
-          .from('watched_shows')
-          .delete()
-          .eq('user_id', userId)
-          .eq('instance_id', instanceId);
-
-        if (error) throw error;
+        await db`
+          DELETE FROM watched_shows
+          WHERE user_id = ${userId} AND instance_id = ${instanceId}
+        `;
       } else if (type === 'pending') {
-        const { error } = await db
-          .from('pending_shows')
-          .delete()
-          .eq('user_id', userId)
-          .eq('pending_id', pendingId);
-
-        if (error) throw error;
+        await db`
+          DELETE FROM pending_shows
+          WHERE user_id = ${userId} AND pending_id = ${pendingId}
+        `;
       }
 
       return sendResponse(200, { success: true });
