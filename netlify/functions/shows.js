@@ -76,7 +76,7 @@ exports.handler = async (event, context) => {
 
       const watched = watchedRows.map(row => ({
         instanceId: row.instance_id,
-        show: row.show_data,
+        show: typeof row.show_data === 'string' ? JSON.parse(row.show_data) : row.show_data,
         seasonsWatched: row.seasons_watched,
         totalMinutes: row.total_minutes,
         episodesWatched: row.episodes_watched,
@@ -85,7 +85,7 @@ exports.handler = async (event, context) => {
 
       const pending = pendingRows.map(row => ({
         id: row.pending_id,
-        show: row.show_data,
+        show: typeof row.show_data === 'string' ? JSON.parse(row.show_data) : row.show_data,
         addedAt: Number(row.added_at)
       }));
 
