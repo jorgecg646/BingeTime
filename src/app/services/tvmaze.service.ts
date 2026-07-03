@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, forkJoin, map, catchError, switchMap } from 'rxjs';
-import { TVShow, Season } from '../models';
+import { TVShow, Season, NewEpisodeInfo } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class TvmazeService {
@@ -125,30 +125,42 @@ export class TvmazeService {
 
   /**
    * Fetches recently updated show IDs and their timestamps from TVMaze.
-   * Used to detect new seasons for shows in the user's watchlist.
+   * Uses the 'week' filter to cover the last 7 days of updates.
    * @returns An observable emitting a record mapping show ID strings to Unix timestamps.
    */
   getShowUpdates(): Observable<Record<string, number>> {
-    return this.http.get<Record<string, number>>(`${this.baseUrl}/updates/shows?since=day`).pipe(
+    return this.http.get<Record<string, number>>(`${this.baseUrl}/updates/shows?since=month`).pipe(
       catchError(() => of({}))
     );
   }
 
   /**
-   * Fetches all seasons for a specific show.
-   * Filters out specials (season number <= 0).
+   * Fetches all aired episodes for a specific show and returns those
+   * that aired within the given number of days.
    * @param showId - The TVMaze show ID.
-   * @returns An observable emitting an array of Season objects.
+   * @param withinDays - How many days back to include (default: 14).
+   * @returns An observable emitting an array of NewEpisodeInfo for recent episodes.
    */
-  getShowSeasons(showId: number): Observable<Season[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/shows/${showId}/seasons`).pipe(
-      map(seasons => seasons
-        .filter((s: any) => s.number > 0)
-        .map((s: any) => ({ season_number: s.number, episode_count: s.episodeOrder || 10 }))
+  getRecentEpisodes(showId: number, withinDays = 30): Observable<NewEpisodeInfo[]> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - withinDays);
+    const cutoffStr = cutoff.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+    return this.http.get<any[]>(`${this.baseUrl}/shows/${showId}/episodes`).pipe(
+      map(episodes =>
+        episodes
+          .filter((ep: any) => ep.airdate && ep.airdate >= cutoffStr && ep.number > 0)
+          .map((ep: any): NewEpisodeInfo => ({
+            season: ep.season,
+            number: ep.number,
+            name: ep.name || '',
+            airdate: ep.airdate
+          }))
       ),
       catchError(() => of([]))
     );
   }
+
 
   /**
    * Maps a raw TVMaze API show object to the internal TVShow model.

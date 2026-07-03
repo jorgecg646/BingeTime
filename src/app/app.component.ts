@@ -118,8 +118,8 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Check for new seasons in background (once per day)
-    this.state.checkForNewSeasons();
+    // Check for new episodes in the last 2 weeks (once per day)
+    this.state.checkForNewEpisodes();
   }
 
   /** Cleans up the background slideshow interval on component destruction. */

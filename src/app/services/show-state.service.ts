@@ -1,6 +1,6 @@
 import { Injectable, signal, computed, inject, effect } from '@angular/core';
 import { forkJoin } from 'rxjs';
-import { TVShow, WatchedShow, PendingShow, NewSeasonAlert } from '../models';
+import { TVShow, WatchedShow, PendingShow, NewEpisodeAlert } from '../models';
 import { TvmazeService } from './tvmaze.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
@@ -18,9 +18,9 @@ export class ShowStateService {
   /** Reactive list of shows saved to watch later. Persisted in localStorage. */
   pendingShows = signal<PendingShow[]>(this.loadPendingFromStorage());
 
-  /** Alerts for shows in the watchlist that have new seasons available. */
-  newSeasonAlerts = signal<NewSeasonAlert[]>(this.loadAlertsFromStorage());
-  /** Whether a background check for new seasons is currently in progress. */
+  /** Alerts for shows in the watchlist that have new episodes in the last 2 weeks. */
+  newEpisodeAlerts = signal<NewEpisodeAlert[]>(this.loadAlertsFromStorage());
+  /** Whether a background check for new episodes is currently in progress. */
   checkingForUpdates = signal<boolean>(false);
 
   /** The show currently displayed in the details modal, or null if closed. */
@@ -354,12 +354,13 @@ export class ShowStateService {
   }
 
   /**
-   * Checks all watched shows for new seasons by comparing against TVMaze updates.
+   * Checks all watched shows for new episodes aired in the last 30 days
+   * by querying TVMaze's monthly updates endpoint and then fetching each
+   * changed show's episode list.
    * Rate-limited to once every 24 hours unless forced.
-   * When new seasons are detected, creates alerts and persists them.
    * @param force - If true, bypasses the 24-hour cooldown.
    */
-  checkForNewSeasons(force = false): void {
+  checkForNewEpisodes(force = false): void {
     const watched = this.watchedShows();
     if (watched.length === 0) return;
 
@@ -375,7 +376,7 @@ export class ShowStateService {
     const storedTimestamps: Record<string, number> = JSON.parse(localStorage.getItem('showUpdateTimestamps') || '{}');
 
     this.tvmaze.getShowUpdates().subscribe(updates => {
-      // Filter to only our shows, and only those that changed
+      // Filter to only our shows that had any change since we last checked
       const changedShowIds = uniqueShowIds.filter(id => {
         const remoteTs = updates[id.toString()];
         const localTs = storedTimestamps[id.toString()] || 0;
@@ -383,9 +384,8 @@ export class ShowStateService {
       });
 
       if (changedShowIds.length === 0) {
-        // Nothing changed, just update the check timestamp
+        // Nothing changed – update the check timestamp and stored timestamps
         localStorage.setItem('lastUpdateCheck', now.toString());
-        // Update all timestamps for our shows
         uniqueShowIds.forEach(id => {
           if (updates[id.toString()]) {
             storedTimestamps[id.toString()] = updates[id.toString()];
@@ -396,33 +396,26 @@ export class ShowStateService {
         return;
       }
 
-      // Fetch seasons for changed shows (respecting rate limits with forkJoin)
-      const seasonRequests = changedShowIds.map(id => this.tvmaze.getShowSeasons(id));
+      // Fetch recent episodes (last 30 days) for all changed shows in parallel
+      const episodeRequests = changedShowIds.map(id => this.tvmaze.getRecentEpisodes(id, 30));
 
-      forkJoin(seasonRequests).subscribe(seasonResults => {
-        const alerts: NewSeasonAlert[] = [];
+      forkJoin(episodeRequests).subscribe(episodeResults => {
+        const alerts: NewEpisodeAlert[] = [];
 
         changedShowIds.forEach((showId, index) => {
-          const currentSeasonCount = seasonResults[index].length;
-          // Find the max seasons the user has watched for this show
-          const userInstances = watched.filter(w => w.show.id === showId);
-          const maxWatched = Math.max(...userInstances.map(w => w.show.number_of_seasons || w.seasonsWatched));
-          const representative = userInstances[0];
+          const recentEps = episodeResults[index];
+          if (recentEps.length === 0) return;
 
-          if (currentSeasonCount > maxWatched && representative) {
-            const newNums: number[] = [];
-            for (let s = maxWatched + 1; s <= currentSeasonCount; s++) {
-              newNums.push(s);
-            }
-            alerts.push({
-              showId,
-              showName: representative.show.name,
-              posterPath: representative.show.poster_path,
-              previousSeasons: maxWatched,
-              currentSeasons: currentSeasonCount,
-              newSeasonNumbers: newNums
-            });
-          }
+          const representative = watched.find(w => w.show.id === showId);
+          if (!representative) return;
+
+          alerts.push({
+            showId,
+            showName: representative.show.name,
+            posterPath: representative.show.poster_path,
+            newEpisodeCount: recentEps.length,
+            newEpisodes: recentEps
+          });
 
           // Update timestamps
           if (updates[showId.toString()]) {
@@ -430,23 +423,22 @@ export class ShowStateService {
           }
         });
 
-        // Merge with existing alerts (don't duplicate)
-        const existingAlerts = this.newSeasonAlerts();
+        // Merge with existing alerts (update if show already has one)
+        const existingAlerts = this.newEpisodeAlerts();
         const mergedAlerts = [...existingAlerts];
         for (const alert of alerts) {
-          if (!mergedAlerts.some(a => a.showId === alert.showId)) {
+          const idx = mergedAlerts.findIndex(a => a.showId === alert.showId);
+          if (idx === -1) {
             mergedAlerts.push(alert);
           } else {
-            // Update existing alert with fresh data
-            const idx = mergedAlerts.findIndex(a => a.showId === alert.showId);
             mergedAlerts[idx] = alert;
           }
         }
 
-        this.newSeasonAlerts.set(mergedAlerts);
+        this.newEpisodeAlerts.set(mergedAlerts);
         this.saveAlerts();
 
-        // Update all timestamps for our shows
+        // Update all timestamps for our shows (also those without new episodes)
         uniqueShowIds.forEach(id => {
           if (updates[id.toString()] && !storedTimestamps[id.toString()]) {
             storedTimestamps[id.toString()] = updates[id.toString()];
@@ -460,27 +452,27 @@ export class ShowStateService {
   }
 
   /**
-   * Dismisses a single new-season alert by show ID.
+   * Dismisses a single new-episode alert by show ID.
    * @param showId - The TVMaze show ID whose alert to dismiss.
    */
   dismissAlert(showId: number): void {
-    this.newSeasonAlerts.update(list => list.filter(a => a.showId !== showId));
+    this.newEpisodeAlerts.update(list => list.filter(a => a.showId !== showId));
     this.saveAlerts();
   }
 
-  /** Dismisses all new-season alerts at once. */
+  /** Dismisses all new-episode alerts at once. */
   dismissAllAlerts(): void {
-    this.newSeasonAlerts.set([]);
+    this.newEpisodeAlerts.set([]);
     this.saveAlerts();
   }
 
   /**
-   * Checks if a show currently has an active new-season alert.
+   * Checks if a show currently has an active new-episode alert.
    * @param showId - The TVMaze show ID.
-   * @returns True if a new-season alert exists for this show.
+   * @returns True if a new-episode alert exists for this show.
    */
-  hasNewSeasonAlert(showId: number): boolean {
-    return this.newSeasonAlerts().some(a => a.showId === showId);
+  hasNewEpisodeAlert(showId: number): boolean {
+    return this.newEpisodeAlerts().some(a => a.showId === showId);
   }
 
   /**
@@ -491,7 +483,7 @@ export class ShowStateService {
     if (confirm('Are you sure you want to delete all shows?')) {
       this.watchedShows.set([]);
       this.pendingShows.set([]);
-      this.newSeasonAlerts.set([]);
+      this.newEpisodeAlerts.set([]);
       this.save();
       this.savePending();
       this.saveAlerts();
@@ -537,18 +529,23 @@ export class ShowStateService {
     }
   }
 
-  /** Persists the new-season alerts to localStorage. */
+  /** Persists the new-episode alerts to localStorage. */
   private saveAlerts(): void {
-    localStorage.setItem('newSeasonAlerts', JSON.stringify(this.newSeasonAlerts()));
+    localStorage.setItem('newEpisodeAlerts', JSON.stringify(this.newEpisodeAlerts()));
   }
 
   /**
-   * Loads new-season alerts from localStorage.
+   * Loads new-episode alerts from localStorage.
    * @returns The array of alerts, or empty array on parse error.
    */
-  private loadAlertsFromStorage(): NewSeasonAlert[] {
+  private loadAlertsFromStorage(): NewEpisodeAlert[] {
     try {
-      return JSON.parse(localStorage.getItem('newSeasonAlerts') || '[]');
+      // Also migrate old 'newSeasonAlerts' key if present
+      const legacy = localStorage.getItem('newSeasonAlerts');
+      if (legacy) {
+        localStorage.removeItem('newSeasonAlerts');
+      }
+      return JSON.parse(localStorage.getItem('newEpisodeAlerts') || '[]');
     } catch {
       return [];
     }

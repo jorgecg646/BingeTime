@@ -56,18 +56,28 @@ export interface PendingShow {
   addedAt: number;
 }
 
-/** Alert data when a show in the user's watchlist has new seasons available. */
-export interface NewSeasonAlert {
+/** Alert data when a show in the user's watchlist has new episodes aired in the last 2 weeks. */
+export interface NewEpisodeAlert {
   /** TVMaze show ID this alert refers to. */
   showId: number;
   /** Display name of the show. */
   showName: string;
   /** URL to the show's poster image, or null if unavailable. */
   posterPath: string | null;
-  /** Number of seasons the user previously had recorded. */
-  previousSeasons: number;
-  /** Current total number of seasons available. */
-  currentSeasons: number;
-  /** Array of the newly detected season numbers. */
-  newSeasonNumbers: number[];
+  /** Number of new episodes aired in the last 2 weeks. */
+  newEpisodeCount: number;
+  /** Details of the new episodes (season, episode number, name, air date). */
+  newEpisodes: NewEpisodeInfo[];
+}
+
+/** Brief info about a single recently-aired episode. */
+export interface NewEpisodeInfo {
+  /** Season number the episode belongs to. */
+  season: number;
+  /** Episode number within the season. */
+  number: number;
+  /** Episode title. */
+  name: string;
+  /** Air date string (YYYY-MM-DD). */
+  airdate: string;
 }
