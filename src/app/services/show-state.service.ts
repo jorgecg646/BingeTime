@@ -31,11 +31,20 @@ export class ShowStateService {
   seasonsToAdd = signal<number>(0);
 
   constructor() {
-    // Listen for authentication changes to synchronize shows
+    // Listen for authentication changes to synchronize shows.
+    // We also read isRestoringSession() so that this effect re-runs once the
+    // JWT refresh is complete — ensuring we never call Neon with a stale token.
     effect(() => {
+      const isRestoring = this.auth.isRestoringSession();
       const user = this.auth.user();
+
+      if (isRestoring) {
+        // Session is being restored; wait for the token refresh to finish.
+        return;
+      }
+
       if (user) {
-        this.loadUserDataFromSupabase(user.id);
+        this.loadUserDataFromNeon(user.id);
       } else {
         this.watchedShows.set(this.loadFromStorage());
         this.pendingShows.set(this.loadPendingFromStorage());
@@ -43,7 +52,7 @@ export class ShowStateService {
     });
   }
 
-  private async loadUserDataFromSupabase(userId: string) {
+  private async loadUserDataFromNeon(userId: string) {
     try {
       const [remoteWatched, remotePending] = await Promise.all([
         this.supabaseService.getWatchedShows(userId),
@@ -53,7 +62,7 @@ export class ShowStateService {
       const localWatched = this.loadFromStorage();
       const localPending = this.loadPendingFromStorage();
 
-      // Sincronizar datos locales iniciales con Supabase si está vacío en la nube
+      // Migrate local data to Neon if the cloud is empty on first login
       if (remoteWatched.length === 0 && localWatched.length > 0) {
         for (const item of localWatched) {
           await this.supabaseService.upsertWatchedShow(userId, item);
@@ -72,7 +81,7 @@ export class ShowStateService {
         this.pendingShows.set(remotePending);
       }
     } catch (err) {
-      console.error('Error loading user data from Supabase:', err);
+      console.error('Error loading user data from Neon:', err);
     }
   }
 

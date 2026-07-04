@@ -11,6 +11,12 @@ export class AuthService {
   /** Reactive signal holding the currently authenticated user, or null. */
   user = signal<User | null>(null);
 
+  /**
+   * True while the app is restoring a persisted session and refreshing its token.
+   * Use this to avoid rendering the "not logged in" state during startup.
+   */
+  isRestoringSession = signal<boolean>(false);
+
   /** Whether a user is currently logged in. */
   isLoggedIn = computed(() => !!this.user());
 
@@ -51,10 +57,28 @@ export class AuthService {
       setCookie: !isLocalhost,
     });
 
-    // Restore user from persisted session
+    // Restore user from persisted session and refresh the token to ensure it's valid.
+    // Without refreshing, GoTrue may return a stale/expired token from localStorage,
+    // which causes Neon API calls to fail silently on devices already logged in.
     const currentUser = this.auth.currentUser();
     if (currentUser) {
-      this.user.set(currentUser);
+      // Refresh the JWT before setting the user so that ShowStateService always
+      // loads data with a valid token (avoids double-fetch / silent failures).
+      this.isRestoringSession.set(true);
+      currentUser.jwt(true)
+        .then(() => {
+          // Re-read the updated user object after token refresh
+          const refreshedUser = this.auth.currentUser();
+          this.user.set(refreshedUser ?? currentUser);
+        })
+        .catch((err: any) => {
+          // If token refresh fails the session is truly expired — log the user out
+          console.warn('Session token refresh failed, logging out:', err);
+          this.user.set(null);
+        })
+        .finally(() => {
+          this.isRestoringSession.set(false);
+        });
     }
   }
 
