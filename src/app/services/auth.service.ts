@@ -57,28 +57,42 @@ export class AuthService {
       setCookie: !isLocalhost,
     });
 
-    // Restore user from persisted session and refresh the token to ensure it's valid.
-    // Without refreshing, GoTrue may return a stale/expired token from localStorage,
-    // which causes Neon API calls to fail silently on devices already logged in.
+    // Restore the persisted session on startup.
+    //
+    // Strategy:
+    //   1. If the stored access token is still valid → set user immediately, no network call.
+    //   2. If the access token is expired → try to refresh it silently before loading data.
+    //   3. If the refresh itself fails (network error, refresh token expired, etc.)
+    //      → keep the user logged in anyway. The Neon API will return 401 and the
+    //      user will see the login screen naturally instead of being surprised by a logout.
     const currentUser = this.auth.currentUser();
     if (currentUser) {
-      // Refresh the JWT before setting the user so that ShowStateService always
-      // loads data with a valid token (avoids double-fetch / silent failures).
-      this.isRestoringSession.set(true);
-      currentUser.jwt(true)
-        .then(() => {
-          // Re-read the updated user object after token refresh
-          const refreshedUser = this.auth.currentUser();
-          this.user.set(refreshedUser ?? currentUser);
-        })
-        .catch((err: any) => {
-          // If token refresh fails the session is truly expired — log the user out
-          console.warn('Session token refresh failed, logging out:', err);
-          this.user.set(null);
-        })
-        .finally(() => {
-          this.isRestoringSession.set(false);
-        });
+      // expires_at is a Unix timestamp in seconds
+      const expiresAt = (currentUser.token?.expires_at ?? 0) * 1000;
+      const tokenIsValid = Date.now() < expiresAt;
+
+      if (tokenIsValid) {
+        // Token still valid — no network call needed, set user immediately.
+        this.user.set(currentUser);
+      } else {
+        // Token expired — refresh before setting user so Neon gets a valid token.
+        this.isRestoringSession.set(true);
+        currentUser.jwt()  // jwt() without force: only refreshes when the token is expired
+          .then(() => {
+            const refreshedUser = this.auth.currentUser();
+            this.user.set(refreshedUser ?? currentUser);
+          })
+          .catch((err: any) => {
+            // Refresh failed (refresh token expired or network error).
+            // Set user from localStorage anyway — a subsequent 401 from Neon
+            // will naturally prompt the user to re-login.
+            console.warn('Could not refresh expired token on startup:', err);
+            this.user.set(currentUser);
+          })
+          .finally(() => {
+            this.isRestoringSession.set(false);
+          });
+      }
     }
   }
 

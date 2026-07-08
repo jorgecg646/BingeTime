@@ -22,6 +22,11 @@ export class ShowStateService {
   newEpisodeAlerts = signal<NewEpisodeAlert[]>(this.loadAlertsFromStorage());
   /** Whether a background check for new episodes is currently in progress. */
   checkingForUpdates = signal<boolean>(false);
+  /**
+   * True while a background sync with Neon is in progress.
+   * localStorage data is shown immediately; this flag can drive a subtle UI indicator.
+   */
+  isSyncingFromNeon = signal<boolean>(false);
 
   /** The show currently displayed in the details modal, or null if closed. */
   activeShowForDetails = signal<TVShow | null>(null);
@@ -53,6 +58,7 @@ export class ShowStateService {
   }
 
   private async loadUserDataFromNeon(userId: string) {
+    this.isSyncingFromNeon.set(true);
     try {
       const [remoteWatched, remotePending] = await Promise.all([
         this.supabaseService.getWatchedShows(userId),
@@ -80,8 +86,16 @@ export class ShowStateService {
       } else {
         this.pendingShows.set(remotePending);
       }
+
+      // Persist the fresh Neon data to localStorage so the next page visit
+      // can show it instantly as a cache while the background sync runs.
+      localStorage.setItem('watchedShows', JSON.stringify(this.watchedShows()));
+      localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
     } catch (err) {
       console.error('Error loading user data from Neon:', err);
+      // Falls back to localStorage data already shown on screen — no disruption.
+    } finally {
+      this.isSyncingFromNeon.set(false);
     }
   }
 

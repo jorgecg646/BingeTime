@@ -60,7 +60,14 @@
                (isScrolled() ? 'bg-slate-950/80 backdrop-blur-xl border-b border-white/10 shadow-2xl py-4' : 'py-2')"
     >
       <a routerLink="/discover" routerLinkActive="bg-white/10 text-white border-white/20" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass">Discover</a>
-      <a routerLink="/" routerLinkActive="bg-white/10 text-white border-white/20" [routerLinkActiveOptions]="{exact: true}" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass flex items-center gap-2">Your Shows <span class="px-1.5 py-0.5 rounded-md bg-blue-600 text-white text-xs font-bold">{{ state.watchedShows().length }}</span></a>
+      <a routerLink="/" routerLinkActive="bg-white/10 text-white border-white/20" [routerLinkActiveOptions]="{exact: true}" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass flex items-center gap-2">Your Shows <span class="px-1.5 py-0.5 rounded-md bg-blue-600 text-white text-xs font-bold">{{ state.watchedShows().length }}</span>
+        @if (state.isSyncingFromNeon()) {
+          <svg class="w-3 h-3 animate-spin text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" title="Syncing with database...">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        }
+      </a>
       <a routerLink="/top-series" routerLinkActive="bg-white/10 text-white border-white/20" class="px-5 py-2.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-all font-semibold text-sm glass">Top 250</a>
     </div>
 
