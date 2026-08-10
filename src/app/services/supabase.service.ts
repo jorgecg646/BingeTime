@@ -12,8 +12,8 @@ export class SupabaseService {
   private auth = inject(AuthService);
   private apiUrl = '/api/shows';
 
-  private getHeaders(): HttpHeaders {
-    const token = this.auth.getToken();
+  private async getHeaders(): Promise<HttpHeaders> {
+    const token = await this.auth.getValidToken();
     return new HttpHeaders({
       'Content-Type': 'application/json',
       'Authorization': token ? `Bearer ${token}` : ''
@@ -28,7 +28,7 @@ export class SupabaseService {
     try {
       const res = await firstValueFrom(
         this.http.get<{ watched: WatchedShow[]; pending: PendingShow[] }>(this.apiUrl, {
-          headers: this.getHeaders()
+          headers: await this.getHeaders()
         })
       );
       return res?.watched || [];
@@ -49,7 +49,7 @@ export class SupabaseService {
         this.http.post<any>(
           this.apiUrl,
           { type: 'watched', item },
-          { headers: this.getHeaders() }
+          { headers: await this.getHeaders() }
         )
       );
     } catch (error) {
@@ -67,7 +67,7 @@ export class SupabaseService {
     try {
       await firstValueFrom(
         this.http.delete<any>(this.apiUrl, {
-          headers: this.getHeaders(),
+          headers: await this.getHeaders(),
           body: { type: 'watched', instanceId }
         })
       );
@@ -85,7 +85,7 @@ export class SupabaseService {
     try {
       const res = await firstValueFrom(
         this.http.get<{ watched: WatchedShow[]; pending: PendingShow[] }>(this.apiUrl, {
-          headers: this.getHeaders()
+          headers: await this.getHeaders()
         })
       );
       return res?.pending || [];
@@ -106,7 +106,7 @@ export class SupabaseService {
         this.http.post<any>(
           this.apiUrl,
           { type: 'pending', item },
-          { headers: this.getHeaders() }
+          { headers: await this.getHeaders() }
         )
       );
     } catch (error) {
@@ -124,7 +124,7 @@ export class SupabaseService {
     try {
       await firstValueFrom(
         this.http.delete<any>(this.apiUrl, {
-          headers: this.getHeaders(),
+          headers: await this.getHeaders(),
           body: { type: 'pending', pendingId }
         })
       );
@@ -144,7 +144,7 @@ export class SupabaseService {
         this.http.post<any>(
           this.apiUrl,
           { action: 'reset' },
-          { headers: this.getHeaders() }
+          { headers: await this.getHeaders() }
         )
       );
     } catch (error) {

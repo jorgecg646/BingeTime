@@ -43,6 +43,28 @@ export class AuthService {
     return u?.token?.access_token || null;
   }
 
+  /**
+   * Returns a valid JWT token, refreshing it first if it has expired.
+   * Use this instead of getToken() before making authenticated API calls
+   * to avoid silent 401 errors caused by a stale access token.
+   */
+  async getValidToken(): Promise<string | null> {
+    const u = this.user();
+    if (!u) return null;
+
+    try {
+      // jwt() refreshes the token automatically when it is expired
+      const token = await u.jwt();
+      // After refresh the signal may not have updated yet, so read from the
+      // returned token string directly.
+      return token || u.token?.access_token || null;
+    } catch (err) {
+      console.warn('Could not refresh token before API call:', err);
+      // Fall back to whatever token we have
+      return u.token?.access_token || null;
+    }
+  }
+
   constructor() {
     // Determine the Netlify site URL dynamically or via environment properties
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';

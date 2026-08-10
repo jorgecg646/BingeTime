@@ -68,26 +68,31 @@ export class ShowStateService {
       const localWatched = this.loadFromStorage();
       const localPending = this.loadPendingFromStorage();
 
-      // Migrate local data to Neon if the cloud is empty on first login
+      // --- Watched shows ---
+      // Only migrate local→server when the server has ZERO records (true first login).
+      // In all other cases the server is the source of truth.
       if (remoteWatched.length === 0 && localWatched.length > 0) {
         for (const item of localWatched) {
           await this.supabaseService.upsertWatchedShow(userId, item);
         }
         this.watchedShows.set(localWatched);
       } else {
+        // Server always wins — this is what makes cross-device sync work.
         this.watchedShows.set(remoteWatched);
       }
 
+      // --- Pending shows ---
       if (remotePending.length === 0 && localPending.length > 0) {
         for (const item of localPending) {
           await this.supabaseService.upsertPendingShow(userId, item);
         }
         this.pendingShows.set(localPending);
       } else {
+        // Server always wins.
         this.pendingShows.set(remotePending);
       }
 
-      // Persist the fresh Neon data to localStorage so the next page visit
+      // Persist the fresh server data to localStorage so the next page visit
       // can show it instantly as a cache while the background sync runs.
       localStorage.setItem('watchedShows', JSON.stringify(this.watchedShows()));
       localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
@@ -510,6 +515,14 @@ export class ShowStateService {
       this.save();
       this.savePending();
       this.saveAlerts();
+
+      // Also purge the user's data from the server when logged in
+      const user = this.auth.user();
+      if (user) {
+        this.supabaseService.resetAllUserData(user.id).catch(err => {
+          console.error('Error resetting user data on server:', err);
+        });
+      }
     }
   }
 
