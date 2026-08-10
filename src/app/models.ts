@@ -44,6 +44,8 @@ export interface WatchedShow {
   episodesWatched: number;
   /** User's personal rating (1-10), or 0 if not rated. */
   userRating: number;
+  /** Timestamp (ms) when the show was added to the watchlist. */
+  addedAt?: number;
 }
 
 /** Represents a show saved to the user's "to watch" pending list. */

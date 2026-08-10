@@ -75,10 +75,10 @@ export class ShowStateService {
         for (const item of localWatched) {
           await this.supabaseService.upsertWatchedShow(userId, item);
         }
-        this.watchedShows.set(localWatched);
+        this.watchedShows.set(localWatched); // already sorted by loadFromStorage
       } else {
         // Server always wins — this is what makes cross-device sync work.
-        this.watchedShows.set(remoteWatched);
+        this.watchedShows.set(this.sortByAddedAt(remoteWatched));
       }
 
       // --- Pending shows ---
@@ -218,13 +218,15 @@ export class ShowStateService {
    */
   addWatchedShow(show: TVShow, seasons: number): void {
     const t = this.calculateTime(show, seasons);
+    const now = Date.now();
     const newInstance: WatchedShow = {
-      instanceId: show.id.toString() + '_' + Date.now().toString() + '_' + Math.random().toString(36).substr(2, 5),
+      instanceId: show.id.toString() + '_' + now.toString() + '_' + Math.random().toString(36).substr(2, 5),
       show: show,
       seasonsWatched: seasons,
       totalMinutes: t.minutes,
       episodesWatched: t.episodes,
-      userRating: 0
+      userRating: 0,
+      addedAt: now
     };
     this.watchedShows.update(list => [newInstance, ...list]);
     this.removePending(show.id);
@@ -531,6 +533,32 @@ export class ShowStateService {
     localStorage.setItem('watchedShows', JSON.stringify(this.watchedShows()));
   }
 
+  /**
+   * Sorts a list of watched shows so the most recently added appears first.
+   * For entries without an explicit addedAt, extracts the timestamp embedded
+   * in instanceId (format: showId_timestamp_random) as a fallback.
+   */
+  private sortByAddedAt(list: WatchedShow[]): WatchedShow[] {
+    return [...list].sort((a, b) => {
+      const tsA = a.addedAt ?? this.extractTimestampFromInstanceId(a.instanceId);
+      const tsB = b.addedAt ?? this.extractTimestampFromInstanceId(b.instanceId);
+      return tsB - tsA;
+    });
+  }
+
+  /**
+   * Attempts to extract the embedded timestamp from an instanceId string.
+   * instanceId format: "showId_timestamp_random" — returns 0 if parsing fails.
+   */
+  private extractTimestampFromInstanceId(instanceId: string): number {
+    const parts = instanceId.split('_');
+    if (parts.length >= 2) {
+      const ts = parseInt(parts[1], 10);
+      if (!isNaN(ts) && ts > 1_000_000_000_000) return ts; // valid ms timestamp
+    }
+    return 0;
+  }
+
   /** Persists the pending shows list to localStorage. */
   private savePending(): void {
     localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
@@ -544,10 +572,11 @@ export class ShowStateService {
   private loadFromStorage(): WatchedShow[] {
     try {
       const data = JSON.parse(localStorage.getItem('watchedShows') || '[]');
-      return data.map((w: any) => ({
+      const list: WatchedShow[] = data.map((w: any) => ({
         ...w,
         instanceId: w.instanceId || w.show.id.toString() + '_' + Math.random().toString(36).substr(2, 5)
       }));
+      return this.sortByAddedAt(list);
     } catch {
       return [];
     }
