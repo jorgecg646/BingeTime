@@ -230,14 +230,13 @@ export class ShowStateService {
     };
     this.watchedShows.update(list => [newInstance, ...list]);
     this.removePending(show.id);
+    this.save();
 
     const user = this.auth.user();
     if (user) {
       this.supabaseService.upsertWatchedShow(user.id, newInstance).catch(err => {
         console.error('Error saving show to Supabase:', err);
       });
-    } else {
-      this.save();
     }
   }
 
@@ -260,14 +259,13 @@ export class ShowStateService {
       }
       return w;
     }));
+    this.save();
 
     const user = this.auth.user();
     if (user && updatedItem) {
       this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err => {
         console.error('Error updating seasons in Supabase:', err);
       });
-    } else {
-      this.save();
     }
   }
 
@@ -277,14 +275,13 @@ export class ShowStateService {
    */
   removeShow(instanceId: string): void {
     this.watchedShows.update(list => list.filter(w => w.instanceId !== instanceId));
+    this.save();
 
     const user = this.auth.user();
     if (user) {
       this.supabaseService.deleteWatchedShow(user.id, instanceId).catch(err => {
         console.error('Error deleting show from Supabase:', err);
       });
-    } else {
-      this.save();
     }
   }
 
@@ -302,14 +299,13 @@ export class ShowStateService {
       }
       return w;
     }));
+    this.save();
 
     const user = this.auth.user();
     if (user && updatedItem) {
       this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err => {
         console.error('Error saving rating to Supabase:', err);
       });
-    } else {
-      this.save();
     }
   }
 
@@ -326,14 +322,13 @@ export class ShowStateService {
       addedAt: Date.now()
     };
     this.pendingShows.update(list => [entry, ...list]);
+    this.savePending();
 
     const user = this.auth.user();
     if (user) {
       this.supabaseService.upsertPendingShow(user.id, entry).catch(err => {
         console.error('Error saving pending show to Supabase:', err);
       });
-    } else {
-      this.savePending();
     }
   }
 
@@ -354,14 +349,13 @@ export class ShowStateService {
     }
 
     this.pendingShows.update(list => list.filter(p => isNum ? p.show.id !== id : p.id !== id));
+    this.savePending();
 
     const user = this.auth.user();
     if (user && pendingIdToDelete) {
       this.supabaseService.deletePendingShow(user.id, pendingIdToDelete).catch(err => {
         console.error('Error deleting pending show from Supabase:', err);
       });
-    } else {
-      this.savePending();
     }
   }
 

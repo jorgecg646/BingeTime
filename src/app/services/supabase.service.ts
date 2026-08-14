@@ -59,17 +59,18 @@ export class SupabaseService {
   }
 
   /**
-   * Deletes a watched show record from Supabase.
+   * Deletes a watched show record from Neon via Serverless API.
    * @param userId - ID of the authenticated user
    * @param instanceId - The unique watch instance ID
    */
   async deleteWatchedShow(userId: string, instanceId: string): Promise<void> {
     try {
       await firstValueFrom(
-        this.http.delete<any>(this.apiUrl, {
-          headers: await this.getHeaders(),
-          body: { type: 'watched', instanceId }
-        })
+        this.http.post<any>(
+          this.apiUrl,
+          { action: 'delete', type: 'watched', instanceId },
+          { headers: await this.getHeaders() }
+        )
       );
     } catch (error) {
       console.error('Error deleting watched show:', error);
@@ -116,17 +117,18 @@ export class SupabaseService {
   }
 
   /**
-   * Deletes a pending show record from Supabase.
+   * Deletes a pending show record from Neon via Serverless API.
    * @param userId - ID of the authenticated user
    * @param pendingId - The unique pending list entry ID
    */
   async deletePendingShow(userId: string, pendingId: string): Promise<void> {
     try {
       await firstValueFrom(
-        this.http.delete<any>(this.apiUrl, {
-          headers: await this.getHeaders(),
-          body: { type: 'pending', pendingId }
-        })
+        this.http.post<any>(
+          this.apiUrl,
+          { action: 'delete', type: 'pending', pendingId },
+          { headers: await this.getHeaders() }
+        )
       );
     } catch (error) {
       console.error('Error deleting pending show:', error);

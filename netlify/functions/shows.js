@@ -104,6 +104,23 @@ exports.handler = async (event, context) => {
         return sendResponse(200, { success: true });
       }
 
+      // Handle delete action sent via POST for maximum proxy/gateway compatibility
+      if (body.action === 'delete') {
+        const { type, instanceId, pendingId } = body;
+        if (type === 'watched' && instanceId) {
+          await db`
+            DELETE FROM watched_shows
+            WHERE user_id = ${userId} AND instance_id = ${instanceId}
+          `;
+        } else if (type === 'pending' && pendingId) {
+          await db`
+            DELETE FROM pending_shows
+            WHERE user_id = ${userId} AND pending_id = ${pendingId}
+          `;
+        }
+        return sendResponse(200, { success: true });
+      }
+
       // Handle single upsert of watched or pending show
       const { type, item } = body;
 
@@ -149,15 +166,26 @@ exports.handler = async (event, context) => {
     }
 
     if (method === 'DELETE') {
-      const body = JSON.parse(event.body || '{}');
-      const { type, instanceId, pendingId } = body;
+      let type, instanceId, pendingId;
+      try {
+        const parsed = JSON.parse(event.body || '{}');
+        type = parsed.type;
+        instanceId = parsed.instanceId;
+        pendingId = parsed.pendingId;
+      } catch (_) {}
 
-      if (type === 'watched') {
+      // Fallback to query string parameters if body was stripped by gateway
+      const query = event.queryStringParameters || {};
+      type = type || query.type;
+      instanceId = instanceId || query.instanceId;
+      pendingId = pendingId || query.pendingId;
+
+      if (type === 'watched' && instanceId) {
         await db`
           DELETE FROM watched_shows
           WHERE user_id = ${userId} AND instance_id = ${instanceId}
         `;
-      } else if (type === 'pending') {
+      } else if (type === 'pending' && pendingId) {
         await db`
           DELETE FROM pending_shows
           WHERE user_id = ${userId} AND pending_id = ${pendingId}
