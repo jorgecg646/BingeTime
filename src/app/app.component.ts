@@ -98,9 +98,9 @@ export class AppComponent implements OnInit, OnDestroy {
    * Initializes the background slideshow, subscribes to URL query params
    * for shareable show links, and triggers the daily new-season check.
    */
-  ngOnInit() {
+  async ngOnInit() {
     // Check if we are handling an external login callback
-    const handled = this.auth.handleExternalLogin();
+    const handled = await this.auth.handleExternalLogin();
     if (handled) {
       this.router.navigate(['/']);
     }

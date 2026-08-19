@@ -31,10 +31,38 @@ export const authGuard: CanActivateFn = () => {
       })
     );
   }
-
   if (authService.isLoggedIn()) {
     return true;
   }
 
   return router.createUrlTree(['/auth']);
 };
+
+/**
+ * Route guard that prevents authenticated users from accessing guest-only routes (like /auth).
+ * Redirects to the home page (/) when an active session exists.
+ */
+export const guestGuard: CanActivateFn = () => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (authService.isRestoringSession()) {
+    return toObservable(authService.isRestoringSession).pipe(
+      filter(restoring => !restoring),
+      take(1),
+      map(() => {
+        if (authService.isLoggedIn()) {
+          return router.createUrlTree(['/']);
+        }
+        return true;
+      })
+    );
+  }
+
+  if (authService.isLoggedIn()) {
+    return router.createUrlTree(['/']);
+  }
+
+  return true;
+};
+

@@ -7,6 +7,7 @@ import { environment } from '../../environments/environment';
 })
 export class AuthService {
   private auth: GoTrue;
+  private refreshTimer: any = null;
 
   /** Reactive signal holding the currently authenticated user, or null. */
   user = signal<User | null>(null);
@@ -44,78 +45,128 @@ export class AuthService {
   }
 
   /**
-   * Returns a valid JWT token, refreshing it first if it has expired.
-   * Use this instead of getToken() before making authenticated API calls
-   * to avoid silent 401 errors caused by a stale access token.
+   * Returns a valid JWT token, refreshing it first if it has expired or is close to expiring.
+   * Use this before making authenticated API calls to avoid 401 errors.
    */
   async getValidToken(): Promise<string | null> {
-    const u = this.user();
+    let u = this.user();
     if (!u) return null;
 
     try {
-      // jwt() refreshes the token automatically when it is expired
-      const token = await u.jwt();
-      // After refresh the signal may not have updated yet, so read from the
-      // returned token string directly.
-      return token || u.token?.access_token || null;
+      const expiresAt = (u.token?.expires_at ?? 0) * 1000;
+      // If token expires in less than 2 minutes or is already expired, refresh it proactively
+      const needsRefresh = Date.now() >= (expiresAt - 2 * 60 * 1000);
+
+      if (needsRefresh) {
+        await u.jwt(true);
+        const updated = this.auth.currentUser();
+        if (updated) {
+          this.user.set(updated);
+          this.scheduleNextRefresh(updated);
+          u = updated;
+        }
+      }
+      return u.token?.access_token || null;
     } catch (err) {
       console.warn('Could not refresh token before API call:', err);
-      // Fall back to whatever token we have
       return u.token?.access_token || null;
     }
   }
 
   constructor() {
-    // Determine the Netlify site URL dynamically or via environment properties
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // When running locally, use the local origin (which will proxy requests to avoid CORS).
-    // In production, use environment.netlifyUrl or fallback to window.location.origin
     const siteUrl = isLocalhost ? window.location.origin : (environment.netlifyUrl || window.location.origin);
     
+    // Always use localStorage persistence (setCookie: false) so sessions
+    // survive indefinitely across all devices/browsers without cookie policy issues.
     this.auth = new GoTrue({
       APIUrl: `${siteUrl}/.netlify/identity`,
-      // Disable cookie storage on localhost to avoid security policies / CORS problems
-      setCookie: !isLocalhost,
+      setCookie: false,
     });
 
-    // Restore the persisted session on startup.
-    //
-    // Strategy:
-    //   1. If the stored access token is still valid → set user immediately, no network call.
-    //   2. If the access token is expired → try to refresh it silently before loading data.
-    //   3. If the refresh itself fails (network error, refresh token expired, etc.)
-    //      → keep the user logged in anyway. The Neon API will return 401 and the
-    //      user will see the login screen naturally instead of being surprised by a logout.
+    // Check if there is an OAuth hash returning in the URL
+    const hasAuthHash = window.location.hash && (
+      window.location.hash.includes('access_token=') ||
+      window.location.hash.includes('confirmation_token=')
+    );
+
+    if (hasAuthHash) {
+      this.isRestoringSession.set(true);
+    }
+
+    // Restore persisted session from localStorage on startup.
     const currentUser = this.auth.currentUser();
     if (currentUser) {
-      // expires_at is a Unix timestamp in seconds
       const expiresAt = (currentUser.token?.expires_at ?? 0) * 1000;
       const tokenIsValid = Date.now() < expiresAt;
 
       if (tokenIsValid) {
-        // Token still valid — no network call needed, set user immediately.
         this.user.set(currentUser);
+        this.scheduleNextRefresh(currentUser);
       } else {
-        // Token expired — refresh before setting user so Neon gets a valid token.
+        // Token expired while the browser was closed; refresh silently using refresh_token
         this.isRestoringSession.set(true);
-        currentUser.jwt()  // jwt() without force: only refreshes when the token is expired
+        currentUser.jwt(true)
           .then(() => {
             const refreshedUser = this.auth.currentUser();
             this.user.set(refreshedUser ?? currentUser);
+            if (refreshedUser) {
+              this.scheduleNextRefresh(refreshedUser);
+            }
           })
           .catch((err: any) => {
-            // Refresh failed (refresh token expired or network error).
-            // Set user from localStorage anyway — a subsequent 401 from Neon
-            // will naturally prompt the user to re-login.
             console.warn('Could not refresh expired token on startup:', err);
-            this.user.set(currentUser);
+            // If the refresh token itself is invalid/revoked, clear user; otherwise keep local state
+            const msg = (err?.message || '').toLowerCase();
+            if (msg.includes('invalid') || msg.includes('revoked')) {
+              this.user.set(null);
+            } else {
+              this.user.set(currentUser);
+            }
           })
           .finally(() => {
             this.isRestoringSession.set(false);
           });
       }
     }
+  }
+
+  /**
+   * Schedules a silent token refresh before the current token expires.
+   * Netlify Identity tokens expire in 60 minutes; we refresh at ~50 minutes.
+   */
+  private scheduleNextRefresh(user: User) {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+
+    const expiresAt = (user.token?.expires_at ?? 0) * 1000;
+    const now = Date.now();
+    // Refresh 5 minutes before expiry, with a minimum delay of 30 seconds
+    const delay = Math.max(expiresAt - now - (5 * 60 * 1000), 30 * 1000);
+
+    this.refreshTimer = setTimeout(async () => {
+      const current = this.auth.currentUser();
+      if (!current) return;
+
+      try {
+        await current.jwt(true);
+        const refreshed = this.auth.currentUser();
+        if (refreshed) {
+          this.user.set(refreshed);
+          this.scheduleNextRefresh(refreshed);
+        }
+      } catch (err) {
+        console.warn('Silent token refresh failed, will retry on next API call:', err);
+        // Retry in 2 minutes
+        this.refreshTimer = setTimeout(() => {
+          if (this.auth.currentUser()) {
+            this.scheduleNextRefresh(this.auth.currentUser()!);
+          }
+        }, 2 * 60 * 1000);
+      }
+    }, delay);
   }
 
   /**
@@ -138,6 +189,7 @@ export class AuthService {
   async login(email: string, password: string): Promise<User> {
     const user = await this.auth.login(email, password, true);
     this.user.set(user);
+    this.scheduleNextRefresh(user);
     return user;
   }
 
@@ -153,9 +205,9 @@ export class AuthService {
   /**
    * Handles the OAuth callback by parsing the access_token from the URL hash.
    * Should be called during app initialization to catch returning OAuth flows.
-   * @returns True if a user was authenticated from the URL hash
+   * @returns Promise resolving to true if a user was authenticated from the URL hash
    */
-  handleExternalLogin(): boolean {
+  async handleExternalLogin(): Promise<boolean> {
     const hash = window.location.hash;
     if (!hash) {
       return false;
@@ -168,31 +220,39 @@ export class AuthService {
       const confirmationToken = params.get('confirmation_token');
 
       if (accessToken) {
-        // Use createUser to restore the session from the access token
-        this.auth.createUser({ access_token: accessToken } as any, true)
-          .then((user: User) => {
-            this.user.set(user);
-            // Clean up the URL hash
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          })
-          .catch((err: any) => {
-            console.error('Error processing OAuth callback:', err);
-          });
-        return true;
+        this.isRestoringSession.set(true);
+        try {
+          // Use createUser to restore the session from the access token and remember it in localStorage
+          const user = await this.auth.createUser({ access_token: accessToken } as any, true);
+          this.user.set(user);
+          this.scheduleNextRefresh(user);
+          // Clean up the URL hash
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          return true;
+        } catch (err: any) {
+          console.error('Error processing OAuth callback:', err);
+          return false;
+        } finally {
+          this.isRestoringSession.set(false);
+        }
       }
 
       if (confirmationToken) {
-        // Confirm the email address
-        this.confirmEmail(confirmationToken)
-          .then((user: User) => {
-            console.log('Email confirmed successfully:', user.email);
-            // Clean up the URL hash
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          })
-          .catch((err: any) => {
-            console.error('Error confirming email:', err);
-          });
-        return true;
+        this.isRestoringSession.set(true);
+        try {
+          // Confirm the email address
+          const user = await this.confirmEmail(confirmationToken);
+          console.log('Email confirmed successfully:', user.email);
+          this.scheduleNextRefresh(user);
+          // Clean up the URL hash
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          return true;
+        } catch (err: any) {
+          console.error('Error confirming email:', err);
+          return false;
+        } finally {
+          this.isRestoringSession.set(false);
+        }
       }
     } catch (err) {
       console.error('Error parsing OAuth/Confirmation hash:', err);
@@ -205,6 +265,10 @@ export class AuthService {
    * @returns Promise resolving when logout is complete
    */
   async logout(): Promise<void> {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
     const currentUser = this.auth.currentUser();
     if (currentUser) {
       await currentUser.logout();
@@ -220,6 +284,8 @@ export class AuthService {
   async confirmEmail(token: string): Promise<User> {
     const user = await this.auth.confirm(token);
     this.user.set(user);
+    this.scheduleNextRefresh(user);
     return user;
   }
 }
+

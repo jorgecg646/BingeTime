@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -731,6 +731,14 @@ export class AuthComponent {
   passwordHasMinLength = computed(() => this.password().length >= 6);
   passwordHasUppercase = computed(() => /[A-Z]/.test(this.password()));
   passwordHasSymbol = computed(() => /[^A-Za-z0-9]/.test(this.password()));
+
+  constructor() {
+    effect(() => {
+      if (this.auth.isLoggedIn()) {
+        this.router.navigate(['/']);
+      }
+    });
+  }
 
   async onSubmit() {
     if (!this.email() || !this.password()) {
