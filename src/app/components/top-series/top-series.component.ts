@@ -1,4 +1,4 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TVShow } from '../../models';
@@ -14,10 +14,11 @@ import { ShowStateService } from '../../services/show-state.service';
   selector: 'app-top-series',
   standalone: true,
   imports: [NgTemplateOutlet, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="animate-fade-in relative z-10">
       <!-- Top header banner -->
-      <div class="mb-8 border-b border-white/5 pb-6">
+      <div id="top-series-catalog" class="mb-8 border-b border-white/5 pb-6 scroll-mt-24">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div class="flex items-center gap-4">
             <a routerLink="/" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all">
@@ -135,7 +136,7 @@ import { ShowStateService } from '../../services/show-state.service';
           <!-- Previous page -->
           <button 
             [disabled]="topRatedCurrentPage() === 1"
-            (click)="topRatedCurrentPage.set(topRatedCurrentPage() - 1)"
+            (click)="goToPage(topRatedCurrentPage() - 1)"
             class="p-2.5 rounded-xl border border-white/5 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
           </button>
@@ -146,7 +147,7 @@ import { ShowStateService } from '../../services/show-state.service';
               <span class="px-2 text-zinc-600 font-bold select-none">...</span>
             } @else {
               <button 
-                (click)="topRatedCurrentPage.set(p)"
+                (click)="goToPage(p)"
                 [class]="topRatedCurrentPage() === p ? 'bg-blue-600 border-blue-500 text-white font-bold' : 'border-white/5 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'"
                 class="w-10 h-10 rounded-xl border text-sm font-semibold transition-all">
                 {{ p }}
@@ -157,7 +158,7 @@ import { ShowStateService } from '../../services/show-state.service';
           <!-- Next page -->
           <button 
             [disabled]="topRatedCurrentPage() === topRatedTotalPages()"
-            (click)="topRatedCurrentPage.set(topRatedCurrentPage() + 1)"
+            (click)="goToPage(topRatedCurrentPage() + 1)"
             class="p-2.5 rounded-xl border border-white/5 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
           </button>
@@ -516,6 +517,17 @@ export class TopSeriesComponent implements OnInit {
     this.activeSearchDropdownShow.set(null);
     this.searchDropdownSeasonsToAdd = 0;
     this.dropdownSeasonWarning = null;
+  }
+
+  /**
+   * Navigates to a specific page of the Top 250 and smoothly scrolls to the catalog header.
+   */
+  goToPage(page: number): void {
+    this.topRatedCurrentPage.set(page);
+    const el = document.getElementById('top-series-catalog');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   /**

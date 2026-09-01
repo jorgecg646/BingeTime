@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, signal, inject, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
@@ -10,6 +10,7 @@ import { ShowStateService } from '../../services/show-state.service';
   selector: 'app-search',
   standalone: true,
   imports: [SlicePipe, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="relative">
       <div class="relative group">
@@ -31,26 +32,31 @@ import { ShowStateService } from '../../services/show-state.service';
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
+        } @else if (searchQuery.length > 0) {
+          <button (click)="searchQuery = ''; onSearchChange('');" class="absolute right-4 top-1/2 -translate-y-1/2 z-10 text-zinc-400 hover:text-white transition-colors p-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
         }
       </div>
+
       @if (showDropdown && searchResults.length > 0) {
         <!-- Backdrop to close dropdown when clicking outside -->
         <div class="fixed inset-0 z-40" (click)="closeDropdown()"></div>
         
-        <div class="absolute z-50 w-full mt-2 glass-strong rounded-xl overflow-hidden animate-fade-in-scale">
+        <div class="absolute z-50 w-full mt-2 glass-strong rounded-xl overflow-hidden animate-fade-in-scale max-h-[70vh] overflow-y-auto custom-scrollbar border border-white/10 shadow-2xl">
           @for (show of searchResults; track show.id) {
-            <div class="border-b border-white/5 last:border-0 relative z-50">
-              <!-- Main row -->
-              <div class="flex items-center gap-4 p-3 hover:bg-white/5 transition-colors cursor-pointer"
-                   (click)="state.addDetailsShowToWatched(show); closeDropdown()">
+            <div class="border-b border-white/5 last:border-0 relative z-50 hover:bg-white/5 transition-colors">
+              <!-- Main row: Clicking opens full details modal -->
+              <div class="flex items-center gap-4 p-3 cursor-pointer"
+                   (click)="state.openDetails(show); closeDropdown()">
                 <div class="relative shrink-0">
-                  <img [src]="show.poster_path" [alt]="show.name" class="w-10 h-14 object-cover rounded-lg" />
+                  <img [src]="show.poster_path" [alt]="show.name" class="w-10 h-14 object-cover rounded-lg shadow-md" />
                   @if (state.isWatched(show.id)) {
-                    <div class="absolute -top-1 -left-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white border border-emerald-400/30 shadow-md">
+                    <div class="absolute -top-1 -left-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white border border-emerald-400/30 shadow-md" title="Watched">
                       <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                     </div>
                   } @else if (state.isInPending(show.id)) {
-                    <div class="absolute -top-1 -left-1 w-4 h-4 bg-violet-600 rounded-full flex items-center justify-center text-white border border-violet-500/30 shadow-md">
+                    <div class="absolute -top-1 -left-1 w-4 h-4 bg-violet-600 rounded-full flex items-center justify-center text-white border border-violet-500/30 shadow-md" title="Pending">
                       <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
                   }
@@ -59,6 +65,9 @@ import { ShowStateService } from '../../services/show-state.service';
                   <h3 class="font-medium text-white truncate">{{ show.name }}@if (show.first_air_date) { <span class="text-zinc-500 font-normal">({{ show.first_air_date | slice:0:4 }})</span>}</h3>
                   <div class="flex items-center gap-2 text-xs text-zinc-500">
                     <span>{{ show.first_air_date | slice:0:4 }}</span>
+                    @if (show.number_of_seasons) {
+                      <span>• {{ show.number_of_seasons }} season{{ show.number_of_seasons !== 1 ? 's' : '' }}</span>
+                    }
                     @if (show.rating !== null) {
                       <span class="flex items-center gap-0.5 font-semibold text-amber-400">
                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
@@ -82,7 +91,7 @@ import { ShowStateService } from '../../services/show-state.service';
 
               <!-- Inline season dropdown -->
               @if (activeSearchDropdownShow()?.id === show.id) {
-                <div class="px-3 pb-3 pt-2 bg-white/3 border-t border-white/5 animate-fade-in relative z-50">
+                <div class="px-3 pb-3 pt-2 bg-white/5 border-t border-white/10 animate-fade-in relative z-50">
                   @if (searchDropdownLoading) {
                     <div class="flex justify-center py-3">
                       <svg class="animate-spin h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24">
@@ -91,7 +100,7 @@ import { ShowStateService } from '../../services/show-state.service';
                       </svg>
                     </div>
                   } @else {
-                    <p class="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">Seasons watched</p>
+                    <p class="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider mb-2">Seasons watched</p>
                     
                     @if (dropdownSeasonWarning) {
                       <div class="mb-2.5 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs leading-snug">
@@ -159,141 +168,128 @@ export class SearchComponent implements OnInit, OnDestroy {
   searchResults: TVShow[] = [];
   /** Whether the search results dropdown is visible. */
   showDropdown = false;
-  /** Whether a search request is currently in flight. */
+  /** Whether a search API request is in-flight. */
   isLoading = false;
 
-  /** The show whose inline season-picker is currently expanded, or null. */
+  /** The show currently expanded in the inline season-picker dropdown. */
   activeSearchDropdownShow = signal<TVShow | null>(null);
-  /** Number of seasons selected in the inline season-picker. */
-  searchDropdownSeasonsToAdd = 0;
-  /** Whether show details are loading for the inline season-picker. */
+  /** Whether full details (seasons) are loading for the expanded search dropdown show. */
   searchDropdownLoading = false;
+  /** Number of seasons selected to add in the inline dropdown. */
+  searchDropdownSeasonsToAdd = 0;
+  /** Array of season numbers [1..N] for the expanded search dropdown show. */
+  searchDropdownSeasonNumbers: number[] = [];
+  /** Warning message if a selected season has not yet aired. */
+  dropdownSeasonWarning: string | null = null;
 
-  /** Subject for debouncing search input changes. */
+  /** RxJS Subject that debounces user input to prevent excessive API calls. */
   private searchSubject = new Subject<string>();
+  private subscription: any;
 
-  /**
-   * Sets up the debounced search pipeline.
-   * Waits 300ms after the user stops typing, then queries the API.
-   */
   ngOnInit() {
-    this.searchSubject.pipe(
+    this.subscription = this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged(),
       switchMap(query => {
-        if (query.length < 2) return of([]);
+        if (!query.trim()) {
+          this.isLoading = false;
+          return of([]);
+        }
         this.isLoading = true;
         return this.tmdb.searchShows(query);
       })
     ).subscribe(results => {
       this.searchResults = results;
       this.isLoading = false;
+      this.showDropdown = true;
     });
   }
 
-  /** Completes the search subject to prevent memory leaks. */
   ngOnDestroy() {
-    this.searchSubject.complete();
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+    }
   }
 
-  /**
-   * Pushes a new query value into the debounced search pipeline
-   * and resets any open inline dropdown.
-   * @param query - The current search input value.
-   */
-  onSearchChange(query: string): void {
+  /** Pushes a new query string to the debounced search subject. */
+  onSearchChange(query: string) {
     this.searchSubject.next(query);
+  }
+
+  /** Closes the search dropdown and collapses any expanded inline season picker. */
+  closeDropdown() {
+    this.showDropdown = false;
     this.activeSearchDropdownShow.set(null);
-    this.searchDropdownSeasonsToAdd = 0;
   }
 
   /**
-   * Toggles the inline season-picker for a search result.
-   * Fetches full show details (with seasons) when opening.
-   * @param show - The show to toggle the dropdown for.
-   * @param event - The click event (stopped from propagating).
+   * Toggles the inline season-picker dropdown for a specific search result show.
+   * If opening, fetches full show details to get accurate season counts and air dates.
+   * @param show - The show to expand or collapse.
+   * @param event - DOM MouseEvent (stopped to prevent row selection).
    */
-  toggleSearchDropdown(show: TVShow, event: Event): void {
+  toggleSearchDropdown(show: TVShow, event: MouseEvent) {
     event.stopPropagation();
+    
     if (this.activeSearchDropdownShow()?.id === show.id) {
       this.activeSearchDropdownShow.set(null);
-      this.searchDropdownSeasonsToAdd = 0;
       return;
     }
+
+    this.activeSearchDropdownShow.set(show);
     this.searchDropdownLoading = true;
+    this.searchDropdownSeasonsToAdd = 0;
     this.dropdownSeasonWarning = null;
-    this.activeSearchDropdownShow.set(null);
-    this.tmdb.getShowDetails(show.id).subscribe(result => {
+
+    this.tmdb.getShowDetails(show.id).subscribe(detailedShow => {
       this.searchDropdownLoading = false;
-      if (result) {
-        this.activeSearchDropdownShow.set(result);
-        this.searchDropdownSeasonsToAdd = 0;
-        this.dropdownSeasonWarning = null;
+      if (detailedShow) {
+        this.activeSearchDropdownShow.set(detailedShow);
+        const count = detailedShow.number_of_seasons || 1;
+        this.searchDropdownSeasonNumbers = Array.from({ length: count }, (_, i) => i + 1);
       }
     });
   }
 
-  /** Warning message if user selects an unreleased season in dropdown. */
-  dropdownSeasonWarning: string | null = null;
-
   /** Checks if a season in the inline dropdown has already aired. */
-  isDropdownSeasonAired(season: number): boolean {
+  isDropdownSeasonAired(seasonNumber: number): boolean {
     const show = this.activeSearchDropdownShow();
     if (!show || !show.seasons || show.seasons.length === 0) return true;
-    const s = show.seasons.find(item => item.season_number === season);
+    const s = show.seasons.find(season => season.season_number === seasonNumber);
     return s ? s.is_aired !== false : true;
   }
 
-  /** Selects a season or sets a warning if unreleased. */
-  selectDropdownSeason(season: number): void {
+  /**
+   * Selects a season in the inline dropdown or sets a warning
+   * if that season has not aired yet.
+   * @param seasonNumber - The season number to select.
+   */
+  selectDropdownSeason(seasonNumber: number) {
     const show = this.activeSearchDropdownShow();
     if (!show) return;
-    const s = show.seasons?.find(item => item.season_number === season);
-    if (s && s.is_aired === false) {
-      const airMsg = s.air_date ? ` (airs on ${s.air_date})` : '';
-      this.dropdownSeasonWarning = `Season ${season} has not been released yet${airMsg}. Please select released seasons.`;
-      return;
-    }
-    this.dropdownSeasonWarning = null;
-    this.searchDropdownSeasonsToAdd = season;
-  }
 
-  /**
-   * Returns an array of season numbers [1..N] for the currently open inline dropdown.
-   * Used to render the season selection buttons.
-   */
-  get searchDropdownSeasonNumbers(): number[] {
-    const show = this.activeSearchDropdownShow();
-    if (!show?.number_of_seasons) return [];
-    return Array.from({ length: show.number_of_seasons }, (_, i) => i + 1);
-  }
-
-  /**
-   * Adds the show from the inline dropdown to the user's watchlist
-   * with the selected number of seasons, then closes the dropdown.
-   */
-  addSearchDropdownShow(): void {
-    const show = this.activeSearchDropdownShow();
-    if (!show || this.searchDropdownSeasonsToAdd === 0) return;
-
-    const unreleased = show.seasons?.find(s => s.season_number <= this.searchDropdownSeasonsToAdd && s.is_aired === false);
-    if (unreleased) {
-      const airMsg = unreleased.air_date ? ` (airs on ${unreleased.air_date})` : '';
-      this.dropdownSeasonWarning = `Cannot add: Season ${unreleased.season_number} has not been released yet${airMsg}.`;
+    const seasonObj = show.seasons?.find(s => s.season_number === seasonNumber);
+    if (seasonObj && seasonObj.is_aired === false) {
+      this.searchDropdownSeasonsToAdd = seasonNumber;
+      this.dropdownSeasonWarning = `Season ${seasonNumber} has not aired yet (air date: ${seasonObj.air_date || 'TBA'}). We'll notify you when it's released.`;
       return;
     }
 
-    this.state.addWatchedShow(show, this.searchDropdownSeasonsToAdd);
-    this.activeSearchDropdownShow.set(null);
-    this.searchDropdownSeasonsToAdd = 0;
     this.dropdownSeasonWarning = null;
-    this.closeDropdown();
+    this.searchDropdownSeasonsToAdd = seasonNumber;
   }
 
-  /** Closes the search dropdown and clears the search query and results. */
-  closeDropdown(): void {
-    this.showDropdown = false;
-    this.searchQuery = '';
-    this.searchResults = [];
+  /**
+   * Confirms adding the show with the selected number of seasons from the inline dropdown,
+   * adds it to the user's watchlist, and closes the search dropdown.
+   */
+  addSearchDropdownShow() {
+    const show = this.activeSearchDropdownShow();
+    if (show && this.searchDropdownSeasonsToAdd > 0) {
+      this.state.addWatchedShow(show, this.searchDropdownSeasonsToAdd);
+      this.activeSearchDropdownShow.set(null);
+      this.closeDropdown();
+      this.searchQuery = '';
+    }
   }
 }

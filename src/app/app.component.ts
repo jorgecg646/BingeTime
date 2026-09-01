@@ -1,19 +1,21 @@
 import { Component, signal, computed, inject, effect, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, ActivatedRoute, Router } from '@angular/router';
 import { ShowStateService } from './services/show-state.service';
+import { TmdbService } from './services/tmdb.service';
 import { ShowDetailsModalComponent } from './components/show-details-modal/show-details-modal.component';
-import { SearchComponent } from './components/search/search.component';
 import { AuthService } from './services/auth.service';
 import { AdsenseComponent } from './components/adsense/adsense.component';
+import { RegionModalComponent } from './components/region-modal/region-modal.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ShowDetailsModalComponent, SearchComponent, AdsenseComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ShowDetailsModalComponent, AdsenseComponent, RegionModalComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit, OnDestroy {
   state = inject(ShowStateService);
+  tmdb = inject(TmdbService);
   auth = inject(AuthService);
   router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -33,7 +35,7 @@ export class AppComponent implements OnInit, OnDestroy {
   onWindowScroll() {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     
-    this.isScrolled.set(scrollTop > 250);
+    this.isScrolled.set(scrollTop > 20);
 
     if (scrollTop <= 50) {
       this.isNavVisible.set(true);

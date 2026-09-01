@@ -17,9 +17,11 @@ export class AdsenseComponent implements AfterViewInit {
   ngAfterViewInit() {
     if (isPlatformBrowser(this.platformId)) {
       try {
-        ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-      } catch (e) {
-        console.error('Error al inicializar AdSense:', e);
+        if (typeof window !== 'undefined' && (window as any).adsbygoogle) {
+          ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        }
+      } catch {
+        // Gracefully ignore if blocked by browser ad blocker
       }
     }
   }

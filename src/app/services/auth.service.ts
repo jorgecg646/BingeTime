@@ -75,7 +75,8 @@ export class AuthService {
 
   constructor() {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const siteUrl = isLocalhost ? window.location.origin : (environment.netlifyUrl || window.location.origin);
+    // Use the secure HTTPS production Netlify Identity endpoint in development/production
+    const siteUrl = (isLocalhost && environment.netlifyUrl) ? environment.netlifyUrl : (environment.netlifyUrl || window.location.origin);
     
     // Always use localStorage persistence (setCookie: false) so sessions
     // survive indefinitely across all devices/browsers without cookie policy issues.

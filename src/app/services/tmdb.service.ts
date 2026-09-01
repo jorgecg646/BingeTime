@@ -1,7 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of, forkJoin, map, catchError } from 'rxjs';
-import { TVShow, Season, NewEpisodeInfo } from '../models';
+import { TVShow, Season, NewEpisodeInfo, WatchProvider } from '../models';
 import { environment } from '../../environments/environment';
 
 // Genre ID to Name mapping for TMDB TV genres
@@ -24,12 +24,122 @@ const TMDB_GENRES: Record<number, string> = {
   37: 'Western'
 };
 
+export interface CountryOption {
+  code: string;
+  name: string;
+  flagUrl: string;
+}
+
+export const SUPPORTED_COUNTRIES: CountryOption[] = [
+  { code: 'DE', name: 'Alemania', flagUrl: 'https://flagcdn.com/w40/de.png' },
+  { code: 'SA', name: 'Arabia Saudita', flagUrl: 'https://flagcdn.com/w40/sa.png' },
+  { code: 'AR', name: 'Argentina', flagUrl: 'https://flagcdn.com/w40/ar.png' },
+  { code: 'AU', name: 'Australia', flagUrl: 'https://flagcdn.com/w40/au.png' },
+  { code: 'AT', name: 'Austria', flagUrl: 'https://flagcdn.com/w40/at.png' },
+  { code: 'BE', name: 'Bélgica', flagUrl: 'https://flagcdn.com/w40/be.png' },
+  { code: 'BO', name: 'Bolivia', flagUrl: 'https://flagcdn.com/w40/bo.png' },
+  { code: 'BR', name: 'Brasil', flagUrl: 'https://flagcdn.com/w40/br.png' },
+  { code: 'CA', name: 'Canadá', flagUrl: 'https://flagcdn.com/w40/ca.png' },
+  { code: 'CL', name: 'Chile', flagUrl: 'https://flagcdn.com/w40/cl.png' },
+  { code: 'CO', name: 'Colombia', flagUrl: 'https://flagcdn.com/w40/co.png' },
+  { code: 'CR', name: 'Costa Rica', flagUrl: 'https://flagcdn.com/w40/cr.png' },
+  { code: 'DK', name: 'Dinamarca', flagUrl: 'https://flagcdn.com/w40/dk.png' },
+  { code: 'EC', name: 'Ecuador', flagUrl: 'https://flagcdn.com/w40/ec.png' },
+  { code: 'ES', name: 'España', flagUrl: 'https://flagcdn.com/w40/es.png' },
+  { code: 'US', name: 'Estados Unidos', flagUrl: 'https://flagcdn.com/w40/us.png' },
+  { code: 'PH', name: 'Filipinas', flagUrl: 'https://flagcdn.com/w40/ph.png' },
+  { code: 'FI', name: 'Finlandia', flagUrl: 'https://flagcdn.com/w40/fi.png' },
+  { code: 'FR', name: 'Francia', flagUrl: 'https://flagcdn.com/w40/fr.png' },
+  { code: 'GR', name: 'Grecia', flagUrl: 'https://flagcdn.com/w40/gr.png' },
+  { code: 'GT', name: 'Guatemala', flagUrl: 'https://flagcdn.com/w40/gt.png' },
+  { code: 'HN', name: 'Honduras', flagUrl: 'https://flagcdn.com/w40/hn.png' },
+  { code: 'IN', name: 'India', flagUrl: 'https://flagcdn.com/w40/in.png' },
+  { code: 'ID', name: 'Indonesia', flagUrl: 'https://flagcdn.com/w40/id.png' },
+  { code: 'IE', name: 'Irlanda', flagUrl: 'https://flagcdn.com/w40/ie.png' },
+  { code: 'IT', name: 'Italia', flagUrl: 'https://flagcdn.com/w40/it.png' },
+  { code: 'JP', name: 'Japón', flagUrl: 'https://flagcdn.com/w40/jp.png' },
+  { code: 'MX', name: 'México', flagUrl: 'https://flagcdn.com/w40/mx.png' },
+  { code: 'NO', name: 'Noruega', flagUrl: 'https://flagcdn.com/w40/no.png' },
+  { code: 'NZ', name: 'Nueva Zelanda', flagUrl: 'https://flagcdn.com/w40/nz.png' },
+  { code: 'NL', name: 'Países Bajos', flagUrl: 'https://flagcdn.com/w40/nl.png' },
+  { code: 'PA', name: 'Panamá', flagUrl: 'https://flagcdn.com/w40/pa.png' },
+  { code: 'PY', name: 'Paraguay', flagUrl: 'https://flagcdn.com/w40/py.png' },
+  { code: 'PE', name: 'Perú', flagUrl: 'https://flagcdn.com/w40/pe.png' },
+  { code: 'PL', name: 'Polonia', flagUrl: 'https://flagcdn.com/w40/pl.png' },
+  { code: 'PT', name: 'Portugal', flagUrl: 'https://flagcdn.com/w40/pt.png' },
+  { code: 'GB', name: 'Reino Unido', flagUrl: 'https://flagcdn.com/w40/gb.png' },
+  { code: 'DO', name: 'República Dominicana', flagUrl: 'https://flagcdn.com/w40/do.png' },
+  { code: 'SE', name: 'Suecia', flagUrl: 'https://flagcdn.com/w40/se.png' },
+  { code: 'CH', name: 'Suiza', flagUrl: 'https://flagcdn.com/w40/ch.png' },
+  { code: 'TR', name: 'Turquía', flagUrl: 'https://flagcdn.com/w40/tr.png' },
+  { code: 'UY', name: 'Uruguay', flagUrl: 'https://flagcdn.com/w40/uy.png' },
+  { code: 'VE', name: 'Venezuela', flagUrl: 'https://flagcdn.com/w40/ve.png' }
+];
+
 @Injectable({ providedIn: 'root' })
 export class TmdbService {
   private http = inject(HttpClient);
   private baseUrl = environment.tmdbBaseUrl || 'https://api.themoviedb.org/3';
   private imageBaseUrl = environment.tmdbImageBaseUrl || 'https://image.tmdb.org/t/p';
   private topRatedShowsCache: TVShow[] | null = null;
+  private showDetailsCache = new Map<number, TVShow>();
+  private discoverCache = new Map<string, { page: number; totalPages: number; totalResults: number; shows: TVShow[] }>();
+  private trendingCache: TVShow[] | null = null;
+
+  readonly COUNTRIES = SUPPORTED_COUNTRIES;
+  readonly selectedCountry = signal<string>(this.getInitialCountryCode());
+  readonly isRegionModalOpen = signal<boolean>(false);
+
+  readonly activeCountry = this.selectedCountry.asReadonly();
+  readonly activeCountryInfo = computed(() => {
+    const code = this.selectedCountry();
+    return this.COUNTRIES.find(c => c.code === code) || this.COUNTRIES[14]; // Default to ES
+  });
+  readonly activeCountryFlagUrl = computed(() => this.activeCountryInfo().flagUrl);
+  readonly activeCountryName = computed(() => this.activeCountryInfo().name);
+
+  openRegionModal(): void {
+    this.isRegionModalOpen.set(true);
+  }
+
+  closeRegionModal(): void {
+    this.isRegionModalOpen.set(false);
+  }
+
+  private getInitialCountryCode(): string {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem('bingetime_user_region');
+        if (saved && saved.trim().length === 2) return saved.toUpperCase();
+      }
+      if (typeof navigator !== 'undefined') {
+        const lang = navigator.language || (navigator.languages && navigator.languages[0]) || '';
+        if (lang.includes('-')) {
+          const region = lang.split('-')[1].toUpperCase();
+          if (region.length === 2) return region;
+        }
+        if (lang.toLowerCase().startsWith('es')) return 'ES';
+        if (lang.toLowerCase().startsWith('en')) return 'US';
+      }
+    } catch {
+      // fallback
+    }
+    return 'ES';
+  }
+
+  /**
+   * Sets the active country and refreshes caches.
+   */
+  setCountry(code: string): void {
+    const upper = code.toUpperCase();
+    this.selectedCountry.set(upper);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('bingetime_user_region', upper);
+      }
+    } catch {}
+    this.discoverCache.clear();
+  }
 
   private getHeaders(): HttpHeaders {
     let headers = new HttpHeaders({
@@ -46,6 +156,10 @@ export class TmdbService {
       return params.set('api_key', environment.tmdbApiKey.trim());
     }
     return params;
+  }
+
+  getUserCountryCode(): string {
+    return this.selectedCountry();
   }
 
   /**
@@ -82,10 +196,15 @@ export class TmdbService {
   /**
    * Fetches full details for a single TV show from TMDB, including its seasons,
    * streaming watch providers, official videos/trailers, recommendations, and reviews.
+   * Cached in-memory for instant modal loads.
    * @param showId - The TMDB show ID.
    * @returns An observable emitting the TVShow or null on error.
    */
   getShowDetails(showId: number): Observable<TVShow | null> {
+    if (this.showDetailsCache.has(showId)) {
+      return of(this.showDetailsCache.get(showId)!);
+    }
+
     let params = new HttpParams()
       .set('language', 'en-US')
       .set('append_to_response', 'watch/providers,videos,recommendations,reviews,credits')
@@ -142,19 +261,25 @@ export class TmdbService {
           mapped.cast = [];
         }
 
-        // 1. Streaming Providers (US / ES / Worldwide)
+        // 1. Streaming Providers by Country
+        const userCountry = this.getUserCountryCode();
         const wpResults = details['watch/providers']?.results;
-        const regionData = wpResults?.['US'] || wpResults?.['ES'] || (wpResults ? Object.values(wpResults)[0] : null) as any;
-        if (regionData?.flatrate && Array.isArray(regionData.flatrate)) {
-          mapped.watch_providers = regionData.flatrate.map((p: any) => ({
-            provider_id: p.provider_id,
-            provider_name: p.provider_name,
-            logo_path: `${this.imageBaseUrl}/w154${p.logo_path}`,
-            display_priority: p.display_priority
-          }));
-        } else {
-          mapped.watch_providers = [];
+        const allProviders: Record<string, WatchProvider[]> = {};
+        if (wpResults) {
+          for (const cCode of Object.keys(wpResults)) {
+            const reg = wpResults[cCode];
+            if (reg && reg.flatrate && Array.isArray(reg.flatrate)) {
+              allProviders[cCode] = reg.flatrate.map((p: any) => ({
+                provider_id: p.provider_id,
+                provider_name: p.provider_name,
+                logo_path: `${this.imageBaseUrl}/w154${p.logo_path}`,
+                display_priority: p.display_priority
+              }));
+            }
+          }
         }
+        mapped.all_watch_providers = allProviders;
+        mapped.watch_providers = allProviders[userCountry] || allProviders['ES'] || allProviders['US'] || Object.values(allProviders)[0] || [];
 
         // 2. Videos / Official YouTube Trailers
         if (details.videos?.results && Array.isArray(details.videos.results)) {
@@ -203,6 +328,7 @@ export class TmdbService {
           mapped.reviews = [];
         }
 
+        this.showDetailsCache.set(showId, mapped);
         return mapped;
       }),
       catchError(err => {
@@ -241,19 +367,23 @@ export class TmdbService {
     });
 
     return forkJoin(requests).pipe(
-      map(resultsArray => {
-        const combined = resultsArray.flat();
-        const mapped = combined
-          .filter((item: any) => item.poster_path)
-          .slice(0, 250)
-          .map((item: any, idx: number) => {
-            const show = this.mapShow(item);
-            show.rank = idx + 1;
-            return show;
-          });
+      map(pagesResults => {
+        const rawShows = pagesResults.flat();
+        const seenIds = new Set<number>();
+        const uniqueShows = rawShows.filter(show => {
+          if (!show.poster_path || seenIds.has(show.id)) return false;
+          seenIds.add(show.id);
+          return true;
+        });
 
-        this.topRatedShowsCache = mapped;
-        return mapped;
+        const top250 = uniqueShows.slice(0, 250).map((raw, index) => {
+          const show = this.mapShow(raw);
+          show.rank = index + 1;
+          return show;
+        });
+
+        this.topRatedShowsCache = top250;
+        return top250;
       }),
       catchError(err => {
         console.error('TMDB top 250 error:', err);
@@ -264,6 +394,7 @@ export class TmdbService {
 
   /**
    * Discovers TV shows with full pagination and multi-filter criteria.
+   * Cached in-memory for instant page turns.
    */
   discoverShows(options: {
     page?: number;
@@ -273,6 +404,11 @@ export class TmdbService {
     decade?: string | null;
     minRating?: number | null;
   }): Observable<{ page: number; totalPages: number; totalResults: number; shows: TVShow[] }> {
+    const cacheKey = JSON.stringify(options);
+    if (this.discoverCache.has(cacheKey)) {
+      return of(this.discoverCache.get(cacheKey)!);
+    }
+
     const page = options.page || 1;
     let params = new HttpParams()
       .set('language', 'en-US')
@@ -282,7 +418,7 @@ export class TmdbService {
     if (options.providerId) {
       params = params
         .set('with_watch_providers', options.providerId.toString())
-        .set('watch_region', 'US');
+        .set('watch_region', this.getUserCountryCode());
     }
     if (options.genreName) {
       const genreId = Object.keys(TMDB_GENRES).find(k => TMDB_GENRES[+k].toLowerCase() === options.genreName?.toLowerCase());
@@ -309,12 +445,14 @@ export class TmdbService {
     }).pipe(
       map(res => {
         if (!res || !res.results) return { page: 1, totalPages: 1, totalResults: 0, shows: [] };
-        return {
+        const result = {
           page: res.page || 1,
           totalPages: Math.min(res.total_pages || 1, 500),
           totalResults: res.total_results || 0,
           shows: res.results.filter((i: any) => i.poster_path).map((i: any) => this.mapShow(i))
         };
+        this.discoverCache.set(cacheKey, result);
+        return result;
       }),
       catchError(err => {
         console.error('TMDB discover error:', err);
@@ -333,7 +471,7 @@ export class TmdbService {
     let params = new HttpParams()
       .set('language', 'en-US')
       .set('with_watch_providers', providerId.toString())
-      .set('watch_region', 'US')
+      .set('watch_region', this.getUserCountryCode())
       .set('sort_by', 'popularity.desc')
       .set('page', page.toString());
     params = this.addAuthParams(params);
@@ -359,10 +497,14 @@ export class TmdbService {
   }
 
   /**
-   * Fetches the trending TV shows of the week from TMDB.
+   * Fetches the trending TV shows of the week from TMDB (cached in-memory).
    * @returns An observable emitting an array of trending TVShow objects.
    */
   getTrendingShows(): Observable<TVShow[]> {
+    if (this.trendingCache && this.trendingCache.length > 0) {
+      return of(this.trendingCache);
+    }
+
     let params = new HttpParams().set('language', 'en-US');
     params = this.addAuthParams(params);
 
@@ -372,7 +514,9 @@ export class TmdbService {
     }).pipe(
       map(res => {
         const results = res.results || [];
-        return results.map((item: any) => this.mapShow(item));
+        const mapped = results.map((item: any) => this.mapShow(item));
+        this.trendingCache = mapped;
+        return mapped;
       }),
       catchError(err => {
         console.error('TMDB trending error:', err);

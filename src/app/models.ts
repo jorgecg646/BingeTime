@@ -22,8 +22,10 @@ export interface TVShow {
   summary?: string;
   /** Genre tags associated with the show. */
   genres?: string[];
-  /** Streaming platforms where the show is available. */
+  /** Streaming platforms where the show is available for the current country. */
   watch_providers?: WatchProvider[];
+  /** Streaming platforms organized by country code (e.g. { ES: [...], US: [...], MX: [...] }). */
+  all_watch_providers?: Record<string, WatchProvider[]>;
   /** Official videos / trailers. */
   videos?: VideoTrailer[];
   /** Recommended / similar shows. */

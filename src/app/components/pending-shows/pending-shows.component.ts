@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { PendingShow, TVShow } from '../../models';
 
@@ -11,6 +11,7 @@ import { PendingShow, TVShow } from '../../models';
   selector: 'app-pending-shows',
   standalone: true,
   imports: [SlicePipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (pendingShows().length > 0) {
       <div class="mt-12 animate-fade-in">
@@ -28,6 +29,7 @@ import { PendingShow, TVShow } from '../../models';
               <!-- Poster Image -->
               @if (item.show.poster_path) {
                 <img [src]="item.show.poster_path" [alt]="item.show.name"
+                     loading="lazy" decoding="async"
                      class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
               } @else {
                 <div class="absolute inset-0 bg-gradient-to-b from-violet-900/40 to-slate-900 flex items-center justify-center">

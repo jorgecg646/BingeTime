@@ -1,5 +1,7 @@
-import { Component, inject, signal, computed, OnInit, output } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit, OnDestroy, output, ChangeDetectionStrategy } from '@angular/core';
 import { SlicePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Subject, Subscription, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { TVShow } from '../../models';
 import { TmdbService } from '../../services/tmdb.service';
 import { ShowStateService } from '../../services/show-state.service';
@@ -7,12 +9,13 @@ import { ShowStateService } from '../../services/show-state.service';
 /**
  * Discover page component.
  * Features a cinematic Hero Spotlight banner, multi-criteria filtering (Platform, Genre, Decade, Sort),
- * and full paginated catalog powered by TMDB.
+ * in-catalog contextual search, and full paginated catalog powered by TMDB.
  */
 @Component({
   selector: 'app-trending',
   standalone: true,
-  imports: [SlicePipe],
+  imports: [SlicePipe, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="animate-fade-in relative z-10 pb-16">
       
@@ -77,7 +80,7 @@ import { ShowStateService } from '../../services/show-state.service';
       }
 
       <!-- 🏷️ Discover Header & Filters Bar -->
-      <div class="mb-8 border-b border-white/5 pb-6">
+      <div id="discover-catalog" class="mb-8 border-b border-white/5 pb-6 scroll-mt-24">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
@@ -142,6 +145,15 @@ import { ShowStateService } from '../../services/show-state.service';
               }
             </div>
 
+            <!-- 🌍 Country / Region Filter (Opens JustWatch-Style Modal) -->
+            <button 
+              (click)="tmdb.openRegionModal()"
+              class="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 font-semibold text-xs shadow-sm active:scale-95">
+              <img [src]="tmdb.activeCountryFlagUrl()" class="w-4 h-3 object-cover rounded-sm shadow-sm" [alt]="tmdb.activeCountry()" />
+              <span>REGION: {{ tmdb.activeCountry() }}</span>
+              <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+
             @if (selectedGenre() || selectedDecade() || selectedProvider() || selectedSort() !== 'popularity.desc') {
               <button 
                 (click)="resetFilters()"
@@ -171,6 +183,30 @@ import { ShowStateService } from '../../services/show-state.service';
               <span>{{ provider.name }}</span>
             </button>
           }
+        </div>
+
+        <!-- 🔍 Discover In-Catalog Search Bar -->
+        <div class="pt-3">
+          <div class="relative max-w-xl group">
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-white transition-colors z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input
+              type="text"
+              [(ngModel)]="searchQuery"
+              (ngModelChange)="onSearchChange($event)"
+              placeholder="Search by show title, genre or keywords in catalog..."
+              class="w-full bg-white/5 hover:bg-white/[0.08] focus:bg-white/10 border border-white/10 focus:border-blue-500/50 rounded-xl py-2.5 pl-10 pr-10 text-white placeholder-zinc-500 text-xs sm:text-sm focus:outline-none transition-all shadow-inner"
+            />
+            @if (searchQuery.trim().length > 0) {
+              <button 
+                (click)="clearSearch()" 
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1 transition-colors"
+                title="Clear search">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            }
+          </div>
         </div>
       </div>
 
@@ -344,9 +380,9 @@ import { ShowStateService } from '../../services/show-state.service';
     </div>
   `
 })
-export class TrendingComponent implements OnInit {
+export class TrendingComponent implements OnInit, OnDestroy {
   state = inject(ShowStateService);
-  private tmdb = inject(TmdbService);
+  tmdb = inject(TmdbService);
 
   openDetails = output<TVShow>();
 
@@ -356,6 +392,11 @@ export class TrendingComponent implements OnInit {
   /** Catalog shows list. */
   shows = signal<TVShow[]>([]);
   loading = signal(false);
+
+  /** In-catalog search query. */
+  searchQuery = '';
+  private searchSubject = new Subject<string>();
+  private searchSub?: Subscription;
 
   /** Pagination signals. */
   currentPage = signal(1);
@@ -396,9 +437,53 @@ export class TrendingComponent implements OnInit {
   dropdownSeasonsToAdd = 0;
   dropdownSeasonWarning: string | null = null;
 
+  constructor() {
+    effect(() => {
+      // Re-fetch catalog whenever user changes country in Region modal
+      this.tmdb.selectedCountry();
+      this.currentPage.set(1);
+      this.loadCatalog();
+    });
+  }
+
   ngOnInit(): void {
-    this.loadCatalog();
     this.loadHeroShow();
+
+    this.searchSub = this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(query => {
+        const trimmed = query.trim();
+        if (!trimmed) {
+          this.loadCatalog();
+          return of(null);
+        }
+        this.loading.set(true);
+        return this.tmdb.searchShows(trimmed);
+      })
+    ).subscribe(results => {
+      if (results) {
+        this.loading.set(false);
+        this.shows.set(results);
+        this.totalPages.set(1);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchSub) {
+      this.searchSub.unsubscribe();
+    }
+  }
+
+  onSearchChange(query: string): void {
+    this.searchSubject.next(query);
+  }
+
+  clearSearch(): void {
+    this.searchQuery = '';
+    this.currentPage.set(1);
+    this.loadCatalog();
   }
 
   loadHeroShow(): void {
@@ -461,6 +546,7 @@ export class TrendingComponent implements OnInit {
   }
 
   resetFilters(): void {
+    this.searchQuery = '';
     this.selectedProvider.set(null);
     this.selectedSort.set('popularity.desc');
     this.selectedGenre.set(null);
@@ -472,7 +558,10 @@ export class TrendingComponent implements OnInit {
   goToPage(page: number): void {
     this.currentPage.set(page);
     this.loadCatalog();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const el = document.getElementById('discover-catalog');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   getVisiblePages(): number[] {

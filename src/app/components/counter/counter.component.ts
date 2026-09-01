@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 
 /**
  * Displays the total watch time counter with days, hours, and minutes,
@@ -8,6 +8,7 @@ import { Component, input } from '@angular/core';
 @Component({
   selector: 'app-counter',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="glass-strong rounded-3xl p-8 md:p-12 mb-10 animate-fade-in">
       <div class="flex items-stretch justify-center gap-2 md:gap-6">

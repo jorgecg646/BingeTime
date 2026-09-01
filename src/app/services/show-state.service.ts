@@ -55,6 +55,7 @@ export class ShowStateService {
       } else {
         this.watchedShows.set(this.loadFromStorage());
         this.pendingShows.set(this.loadPendingFromStorage());
+        this.autoMigrateLegacyShows();
       }
     });
   }
@@ -96,6 +97,7 @@ export class ShowStateService {
       // can show it instantly as a cache while the background sync runs.
       localStorage.setItem('watchedShows', JSON.stringify(this.watchedShows()));
       localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
+      this.autoMigrateLegacyShows();
     } catch (err) {
       console.error('Error loading user data from Neon:', err);
       // Falls back to localStorage data already shown on screen — no disruption.
@@ -105,21 +107,142 @@ export class ShowStateService {
   }
 
   /**
-   * Opens the details modal for a show.
-   * If the show already has a summary cached, displays it immediately.
-   * Otherwise, fetches full details from the API first.
-   * @param show - The show to display details for.
+   * Helper to verify if two show titles are the same show (handles punctuation, accents, casing).
    */
-  openDetails(show: TVShow): void {
-    if (show.summary && show.seasons && show.seasons.length > 0) {
-      this.activeShowForDetails.set(show);
-    } else {
-      this.tmdb.getShowDetails(show.id).subscribe(result => {
-        if (result) {
-          this.activeShowForDetails.set(result);
+  private isNameMatching(name1: string, name2: string): boolean {
+    if (!name1 || !name2) return false;
+    const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const c1 = clean(name1);
+    const c2 = clean(name2);
+    return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+  }
+
+  /**
+   * Migrates a legacy TVMaze show to its official TMDB show record across watched and pending lists.
+   */
+  private migrateShowInState(oldId: number, newShow: TVShow): void {
+    const user = this.auth.user();
+
+    // Update in watched shows
+    this.watchedShows.update(list =>
+      list.map(item => {
+        if (item.show.id === oldId || this.isNameMatching(item.show.name, newShow.name)) {
+          const updatedItem: WatchedShow = {
+            ...item,
+            show: {
+              ...newShow,
+              seasons: newShow.seasons && newShow.seasons.length > 0 ? newShow.seasons : item.show.seasons
+            }
+          };
+          if (user) {
+            this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err =>
+              console.error('Error syncing migrated watched show to server:', err)
+            );
+          }
+          return updatedItem;
+        }
+        return item;
+      })
+    );
+    this.save();
+
+    // Update in pending shows
+    this.pendingShows.update(list =>
+      list.map(item => {
+        if (item.show.id === oldId || this.isNameMatching(item.show.name, newShow.name)) {
+          const updatedPending: PendingShow = {
+            ...item,
+            show: newShow
+          };
+          if (user) {
+            this.supabaseService.upsertPendingShow(user.id, updatedPending).catch(err =>
+              console.error('Error syncing migrated pending show to server:', err)
+            );
+          }
+          return updatedPending;
+        }
+        return item;
+      })
+    );
+    this.savePending();
+  }
+
+  /**
+   * Scans existing shows for legacy TVMaze entries and automatically converts them to TMDB.
+   */
+  private autoMigrateLegacyShows(): void {
+    const legacyWatched = this.watchedShows().filter(w => w.show.poster_path?.includes('tvmaze.com'));
+    for (const w of legacyWatched) {
+      this.tmdb.searchShows(w.show.name).subscribe(results => {
+        const match = results.find(s => this.isNameMatching(s.name, w.show.name)) || results[0];
+        if (match) {
+          this.tmdb.getShowDetails(match.id).subscribe(detailed => {
+            if (detailed) {
+              this.migrateShowInState(w.show.id, detailed);
+            }
+          });
         }
       });
     }
+
+    const legacyPending = this.pendingShows().filter(p => p.show.poster_path?.includes('tvmaze.com'));
+    for (const p of legacyPending) {
+      this.tmdb.searchShows(p.show.name).subscribe(results => {
+        const match = results.find(s => this.isNameMatching(s.name, p.show.name)) || results[0];
+        if (match) {
+          this.tmdb.getShowDetails(match.id).subscribe(detailed => {
+            if (detailed) {
+              this.migrateShowInState(p.show.id, detailed);
+            }
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * Opens the details modal for a show.
+   * Checks for ID mismatches between legacy TVMaze IDs and TMDB,
+   * searching TMDB by show title to always load the correct show.
+   * @param show - The show to display details for.
+   */
+  openDetails(show: TVShow): void {
+    this.activeShowForDetails.set(show);
+    
+    const isLegacy = show.poster_path?.includes('tvmaze.com');
+    if (isLegacy) {
+      this.tmdb.searchShows(show.name).subscribe(results => {
+        const match = results.find(s => this.isNameMatching(s.name, show.name)) || results[0];
+        if (match) {
+          this.tmdb.getShowDetails(match.id).subscribe(result => {
+            if (result) {
+              this.migrateShowInState(show.id, result);
+              this.activeShowForDetails.set(result);
+            }
+          });
+        }
+      });
+      return;
+    }
+
+    this.tmdb.getShowDetails(show.id).subscribe(result => {
+      if (result && this.isNameMatching(result.name, show.name)) {
+        this.activeShowForDetails.set(result);
+      } else {
+        // ID mismatch! Search TMDB by name to find the exact show
+        this.tmdb.searchShows(show.name).subscribe(results => {
+          const match = results.find(s => this.isNameMatching(s.name, show.name)) || results[0];
+          if (match) {
+            this.tmdb.getShowDetails(match.id).subscribe(correctShow => {
+              if (correctShow) {
+                this.migrateShowInState(show.id, correctShow);
+                this.activeShowForDetails.set(correctShow);
+              }
+            });
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -144,11 +267,44 @@ export class ShowStateService {
   addDetailsShowToWatched(show: TVShow): void {
     this.activeShowForDetails.set(null);
     this.seasonWarning.set(null);
+
+    const isLegacy = show.poster_path?.includes('tvmaze.com');
+    if (isLegacy) {
+      this.tmdb.searchShows(show.name).subscribe(results => {
+        const match = results.find(s => this.isNameMatching(s.name, show.name)) || results[0];
+        if (match) {
+          this.tmdb.getShowDetails(match.id).subscribe(result => {
+            if (result) {
+              this.migrateShowInState(show.id, result);
+              this.selectedShow.set(result);
+              this.seasonsToAdd.set(0);
+              this.seasonWarning.set(null);
+            }
+          });
+        }
+      });
+      return;
+    }
+
     this.tmdb.getShowDetails(show.id).subscribe(result => {
-      if (result) {
+      if (result && this.isNameMatching(result.name, show.name)) {
         this.selectedShow.set(result);
         this.seasonsToAdd.set(0);
         this.seasonWarning.set(null);
+      } else {
+        this.tmdb.searchShows(show.name).subscribe(results => {
+          const match = results.find(s => this.isNameMatching(s.name, show.name)) || results[0];
+          if (match) {
+            this.tmdb.getShowDetails(match.id).subscribe(correctShow => {
+              if (correctShow) {
+                this.migrateShowInState(show.id, correctShow);
+                this.selectedShow.set(correctShow);
+                this.seasonsToAdd.set(0);
+                this.seasonWarning.set(null);
+              }
+            });
+          }
+        });
       }
     });
   }

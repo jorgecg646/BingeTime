@@ -1,4 +1,4 @@
-import { Component, input, output, signal, computed, inject } from '@angular/core';
+import { Component, input, output, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WatchedShow, TVShow } from '../../models';
@@ -14,6 +14,7 @@ import { ShowStateService } from '../../services/show-state.service';
   selector: 'app-your-shows',
   standalone: true,
   imports: [SlicePipe, FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (watchedShows().length > 0) {
       <div class="space-y-4">
@@ -27,9 +28,11 @@ import { ShowStateService } from '../../services/show-state.service';
           
           <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0 rounded-2xl overflow-hidden shadow-2xl border border-white/5">
             @for (item of watchedShows(); track item.instanceId; let i = $index) {
-              <div class="relative aspect-[2/3] overflow-hidden group animate-slide-up" [style.animation-delay]="i * 50 + 'ms'">
+              <div class="relative aspect-[2/3] overflow-hidden group animate-slide-up cursor-pointer" 
+                   (click)="openDetails.emit(item.show)"
+                   [style.animation-delay]="i * 50 + 'ms'">
                 <!-- Poster Image -->
-                <img [src]="item.show.poster_path" [alt]="item.show.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <img [src]="item.show.poster_path" [alt]="item.show.name" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 
                 <!-- New episode notification badge -->
                 @if (state.hasNewEpisodeAlert(item.show.id)) {
@@ -40,7 +43,7 @@ import { ShowStateService } from '../../services/show-state.service';
                 
                 <!-- Golden Circular Delete Button (Always visible) -->
                 <button (click)="removeShow.emit(item.instanceId); $event.stopPropagation()" 
-                        class="absolute top-2 right-2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full border-4 border-amber-500 bg-black/60 text-amber-500 hover:bg-amber-500 hover:text-black transition-all flex items-center justify-center active:scale-95" 
+                        class="absolute top-2 right-2 z-20 w-8 h-8 sm:w-11 sm:h-11 rounded-full border-4 border-amber-500 bg-black/60 text-amber-500 hover:bg-amber-500 hover:text-black transition-all flex items-center justify-center active:scale-95 shadow-lg" 
                         title="Delete show">
                   <svg class="w-4 h-4 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="4"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
@@ -52,7 +55,7 @@ import { ShowStateService } from '../../services/show-state.service';
                 </div>
                 
                 <!-- Glassmorphic Hover Overlay -->
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/85 backdrop-blur-md flex flex-col justify-between p-2 sm:p-5 select-none cursor-pointer"
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/85 backdrop-blur-md flex flex-col justify-between p-2 sm:p-5 select-none cursor-pointer z-10"
                      (click)="openDetails.emit(item.show)">
                   
                   <!-- Top: Title & Delete button -->
@@ -146,38 +149,29 @@ import { ShowStateService } from '../../services/show-state.service';
 export class YourShowsComponent {
   state = inject(ShowStateService);
 
-  /** The list of watched shows to display. */
   watchedShows = input.required<WatchedShow[]>();
-  
-  /** Emits when the user clicks a show to view its details. */
+
   openDetails = output<TVShow>();
-  /** Emits when the user changes the number of watched seasons. */
   changeSeason = output<{ item: WatchedShow; delta: number }>();
-  /** Emits the instanceId of a show the user wants to remove. */
   removeShow = output<string>();
-  /** Emits when the user sets a personal rating for a show. */
   setUserRating = output<{ item: WatchedShow; rating: number }>();
 
-  /** Available rating values for the user rating dropdown (1-10). */
-  ratingOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  /** Whether the full grid is expanded (vs. collapsed with blur overlay). */
-  isExpanded = signal(false);
-  
-  /** Whether to show the expand/collapse toggle (only when more than 6 shows). */
+  isExpanded = signal<boolean>(false);
   showCollapseControls = computed(() => this.watchedShows().length > 6);
 
-  /**
-   * Formats a minute count into a human-readable duration string.
-   * Shows days+hours, hours+minutes, or minutes only as appropriate.
-   * @param minutes - Total minutes to format.
-   * @returns A compact string like "3d 5h", "2h 30m", or "45m".
-   */
+  ratingOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
   formatTime(minutes: number): string {
-    const d = Math.floor(minutes / 1440);
-    const h = Math.floor((minutes % 1440) / 60);
-    const m = minutes % 60;
-    if (d > 0) return `${d}d ${h}h`;
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
+    const days = Math.floor(minutes / (24 * 60));
+    const hours = Math.floor((minutes % (24 * 60)) / 60);
+    const mins = minutes % 60;
+    
+    if (days > 0) {
+      return `${days}d ${hours}h`;
+    }
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
   }
 }

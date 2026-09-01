@@ -1,15 +1,17 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ShowStateService } from '../../services/show-state.service';
 import { CounterComponent } from '../counter/counter.component';
 import { YourShowsComponent } from '../your-shows/your-shows.component';
 import { PendingShowsComponent } from '../pending-shows/pending-shows.component';
+import { SearchComponent } from '../search/search.component';
 import { PendingShow } from '../../models';
 
 @Component({
   selector: 'app-your-shows-page',
   standalone: true,
-  imports: [RouterLink, CounterComponent, YourShowsComponent, PendingShowsComponent],
+  imports: [RouterLink, CounterComponent, YourShowsComponent, PendingShowsComponent, SearchComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="animate-fade-in relative z-10">
 
@@ -21,6 +23,11 @@ import { PendingShow } from '../../models';
         [totalEpisodes]="state.totalEpisodes()" 
         [watchedShowsCount]="state.watchedShows().length">
       </app-counter>
+
+      <!-- Search Bar for adding shows to watchlist -->
+      <div class="mb-8">
+        <app-search></app-search>
+      </div>
 
       <!-- New & Upcoming Episodes Section (always visible when user has shows) -->
       @if (state.watchedShows().length > 0) {
