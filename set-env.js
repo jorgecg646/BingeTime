@@ -39,8 +39,12 @@ if (!fs.existsSync(envDir)) {
 const tmdbToken = process.env.TMBD_API_READ || 
                   process.env.TMDB_API_READ || 
                   process.env.TMDB_API_READ_ACCESS_TOKEN || 
-                  process.env.TMDB_API_TOKEN || '';
-const tmdbKey = process.env.TMDB_API_KEY || process.env.TMBD_API_KEY || '';
+                  process.env.TMDB_API_TOKEN || 
+                  process.env.TMDB_TOKEN || 
+                  process.env.TMDB_READ_TOKEN || '';
+const tmdbKey = process.env.TMDB_API_KEY || 
+                process.env.TMBD_API_KEY || 
+                process.env.TMDB_KEY || '';
 
 // 2. Generate local/dev environment.ts with TMDB token if available
 let devContent = fs.existsSync(devTemplatePath)
