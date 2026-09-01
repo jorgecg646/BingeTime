@@ -117,9 +117,13 @@
     <footer class="py-8 border-t border-white/5 mt-auto relative z-10">
       <div class="container mx-auto px-4 md:px-8 max-w-[1600px]">
         <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-          <div class="flex items-center gap-4 text-zinc-400">
-            <span>Data from</span>
-            <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer" class="text-zinc-400 hover:text-white transition-colors">TVMaze</a>
+          <div class="flex flex-col sm:flex-row items-center gap-3 text-zinc-400">
+            <div class="flex items-center gap-2">
+              <span>Data provided by</span>
+              <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" class="font-bold text-sky-400 hover:text-sky-300 transition-colors">TMDB</a>
+            </div>
+            <span class="hidden sm:inline text-zinc-600">•</span>
+            <span class="text-xs text-zinc-500">This product uses the TMDB API but is not endorsed or certified by TMDB.</span>
           </div>
           <button (click)="state.resetAll()" class="text-zinc-400 hover:text-red-400 transition-colors text-sm">Reset data</button>
         </div>
@@ -148,12 +152,16 @@
             <div class="flex items-center gap-3 text-sm text-zinc-500">
               <span>{{ state.selectedShow()!.number_of_seasons }} seasons</span>
               <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
-              <span>~{{ state.selectedShow()!.episode_run_time }} min/ep</span>
+              @if (state.selectedShow()!.episode_run_time && state.selectedShow()!.episode_run_time > 0) {
+                <span>~{{ state.selectedShow()!.episode_run_time }} min/ep</span>
+              } @else {
+                <span class="text-amber-400 font-medium">Pending release</span>
+              }
             </div>
             @if (state.selectedShow()!.rating !== null) {
               <div class="flex items-center gap-1.5 mt-2 text-sm font-semibold text-amber-400">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
-                {{ state.selectedShow()!.rating }} <span class="text-zinc-600 font-normal">/ 10 on TVMaze</span>
+                {{ state.selectedShow()!.rating }} <span class="text-zinc-600 font-normal">/ 10 on TMDB</span>
               </div>
             }
           </div>
@@ -161,11 +169,31 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
+
+        @if (state.seasonWarning()) {
+          <div class="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs flex items-center gap-3 animate-fade-in">
+            <svg class="w-5 h-5 shrink-0 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+              <p class="font-bold text-white mb-0.5">Not available yet</p>
+              <p>{{ state.seasonWarning() }}</p>
+            </div>
+          </div>
+        }
+
         <div class="mb-8">
           <label class="block text-sm text-zinc-400 mb-4">Seasons watched</label>
           <div class="flex flex-wrap gap-2">
             @for (season of state.seasonNumbers; track season) {
-              <button (click)="state.seasonsToAdd.set(season)" [class]="state.seasonsToAdd() === season ? 'bg-white text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'" class="w-11 h-11 rounded-xl font-medium transition-all">{{ season }}</button>
+              <button (click)="state.selectSeason(season)" 
+                      [class]="state.seasonsToAdd() === season 
+                        ? 'bg-white text-black font-bold' 
+                        : (state.isSeasonAired(season) ? 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white' : 'bg-white/5 text-amber-400/60 hover:bg-white/10 border border-dashed border-amber-500/30')" 
+                      class="w-11 h-11 rounded-xl font-medium transition-all relative">
+                {{ season }}
+                @if (!state.isSeasonAired(season)) {
+                  <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                }
+              </button>
             }
           </div>
         </div>

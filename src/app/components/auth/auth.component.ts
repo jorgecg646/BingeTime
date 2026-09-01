@@ -278,7 +278,7 @@ import { AuthService } from '../../services/auth.service';
 
         <!-- Footer -->
         <p class="auth-footer">
-          Data from <a href="https://www.tvmaze.com/" target="_blank" rel="noopener noreferrer">TVMaze</a>
+          Data provided by <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>
         </p>
       </div>
     </div>

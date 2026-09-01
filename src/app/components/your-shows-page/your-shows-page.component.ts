@@ -22,7 +22,7 @@ import { PendingShow } from '../../models';
         [watchedShowsCount]="state.watchedShows().length">
       </app-counter>
 
-      <!-- New Episodes Section (always visible when user has shows) -->
+      <!-- New & Upcoming Episodes Section (always visible when user has shows) -->
       @if (state.watchedShows().length > 0) {
         <div class="mb-8 mt-6 glass-strong rounded-2xl border overflow-hidden animate-fade-in"
              [class]="state.newEpisodeAlerts().length > 0 ? 'border-amber-500/20' : 'border-white/5'">
@@ -41,14 +41,14 @@ import { PendingShow } from '../../models';
               </div>
               <div>
                 @if (state.checkingForUpdates()) {
-                  <h3 class="text-white font-bold text-sm">Checking for new episodes...</h3>
-                  <p class="text-zinc-500 text-[11px]">Comparing your {{ state.watchedShows().length }} shows with TVMaze</p>
+                  <h3 class="text-white font-bold text-sm">Checking for episodes...</h3>
+                  <p class="text-zinc-500 text-[11px]">Comparing your {{ state.watchedShows().length }} shows with TMDB</p>
                 } @else if (state.newEpisodeAlerts().length > 0) {
-                  <h3 class="text-white font-bold text-xl">New Episodes in the Last Month</h3>
-                  <p class="text-zinc-500 text-sm">{{ state.newEpisodeAlerts().length }} show{{ state.newEpisodeAlerts().length !== 1 ? 's' : '' }} with new episodes</p>
+                  <h3 class="text-white font-bold text-xl">New & Upcoming Episodes</h3>
+                  <p class="text-zinc-500 text-sm">{{ state.newEpisodeAlerts().length }} show{{ state.newEpisodeAlerts().length !== 1 ? 's' : '' }} with recent or upcoming releases</p>
                 } @else {
                   <h3 class="text-white font-bold text-lg">All up to date</h3>
-                  <p class="text-zinc-500 text-sm">No new episodes in the last month for your shows</p>
+                  <p class="text-zinc-500 text-sm">No new or upcoming episodes scheduled for your shows</p>
                 }
               </div>
             </div>
@@ -72,30 +72,46 @@ import { PendingShow } from '../../models';
           @if (state.newEpisodeAlerts().length > 0) {
             <div class="flex gap-4 p-5 overflow-x-auto no-scrollbar">
               @for (alert of state.newEpisodeAlerts(); track alert.showId) {
-                <div class="flex-none w-80 bg-white/5 border border-white/8 rounded-2xl p-4 flex gap-4 items-start animate-slide-up hover:bg-white/10 hover:border-amber-500/20 transition-all group shadow-lg">
+                <div class="flex-none w-[340px] sm:w-[360px] bg-[#0c101c]/90 border border-white/10 rounded-2xl p-4 flex gap-4 items-start animate-slide-up hover:border-amber-500/30 transition-all group shadow-2xl backdrop-blur-md">
+                  
+                  <!-- Poster with golden circular Badge -->
                   <div class="relative shrink-0 cursor-pointer" (click)="state.openDetailsById(alert.showId)">
-                    <img [src]="alert.posterPath" [alt]="alert.showName" class="w-24 h-32 object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform duration-300" />
-                    <div class="absolute -top-2 -right-2 min-w-[24px] h-[24px] px-1.5 bg-amber-500 rounded-full flex items-center justify-center text-black text-xs font-black animate-pulse shadow-lg border-2 border-amber-300">{{ alert.newEpisodeCount }}</div>
+                    <img [src]="alert.posterPath" [alt]="alert.showName" class="w-24 h-36 object-cover rounded-xl shadow-lg group-hover:scale-105 transition-transform duration-300" />
+                    <div class="absolute -top-2.5 -right-2.5 w-7 h-7 rounded-full flex items-center justify-center text-black text-xs font-black shadow-lg border-2 bg-amber-400 border-amber-300">
+                      {{ alert.newEpisodeCount || 1 }}
+                    </div>
                   </div>
-                  <div class="flex-1 min-w-0 py-1">
-                    <h4 class="text-white text-base font-bold leading-snug cursor-pointer hover:text-amber-400 transition-colors line-clamp-2" (click)="state.openDetailsById(alert.showId)">{{ alert.showName }}</h4>
-                    <p class="text-amber-400 text-sm font-semibold mt-2">
+
+                  <!-- Details -->
+                  <div class="flex-1 min-w-0 py-0.5">
+                    <h4 class="text-white text-lg font-bold leading-tight cursor-pointer hover:text-amber-400 transition-colors line-clamp-1" (click)="state.openDetailsById(alert.showId)">
+                      {{ alert.showName }}
+                    </h4>
+                    
+                    <p class="font-bold text-sm mt-1 text-amber-400">
                       {{ alert.newEpisodeCount }} new episode{{ alert.newEpisodeCount !== 1 ? 's' : '' }}
                     </p>
+
                     @if (alert.newEpisodes.length > 0) {
-                      <p class="text-zinc-300 text-xs mt-1 leading-snug font-medium">
-                        @if (alert.newEpisodes.length === 1) {
-                          S{{ alert.newEpisodes[0].season }}E{{ alert.newEpisodes[0].number }} · {{ alert.newEpisodes[0].airdate }}
-                        } @else {
+                      <p class="text-zinc-300 text-xs mt-1 font-semibold">
+                        @if (alert.newEpisodes.length > 1) {
                           S{{ alert.newEpisodes[0].season }}E{{ alert.newEpisodes[0].number }} – S{{ alert.newEpisodes[alert.newEpisodes.length - 1].season }}E{{ alert.newEpisodes[alert.newEpisodes.length - 1].number }}
+                        } @else {
+                          S{{ alert.newEpisodes[0].season }}E{{ alert.newEpisodes[0].number }} · {{ alert.newEpisodes[0].airdate }}
                         }
                       </p>
                       @if (alert.newEpisodes[0].name) {
                         <p class="text-zinc-500 text-xs mt-0.5 italic truncate">"{{ alert.newEpisodes[0].name }}"</p>
                       }
                     }
-                    <button (click)="state.dismissAlert(alert.showId)" class="mt-3 px-3 py-1 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-bold rounded-lg uppercase tracking-wider transition-colors">Dismiss</button>
+
+                    <!-- Dismiss Button -->
+                    <button (click)="state.dismissAlert(alert.showId)" 
+                            class="mt-3.5 px-4 py-1.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white text-xs font-black rounded-lg uppercase tracking-wider transition-all shadow-md">
+                      DISMISS
+                    </button>
                   </div>
+
                 </div>
               }
             </div>

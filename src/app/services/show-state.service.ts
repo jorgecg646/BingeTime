@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, inject, effect } from '@angular/core';
-import { forkJoin } from 'rxjs';
-import { TVShow, WatchedShow, PendingShow, NewEpisodeAlert } from '../models';
-import { TvmazeService } from './tvmaze.service';
+import { forkJoin, of, Observable } from 'rxjs';
+import { TVShow, WatchedShow, PendingShow, NewEpisodeAlert, NewEpisodeInfo } from '../models';
+import { TmdbService } from './tmdb.service';
 import { AuthService } from './auth.service';
 import { SupabaseService } from './supabase.service';
 
@@ -9,7 +9,7 @@ import { SupabaseService } from './supabase.service';
   providedIn: 'root'
 })
 export class ShowStateService {
-  private tvmaze = inject(TvmazeService);
+  private tmdb = inject(TmdbService);
   private auth = inject(AuthService);
   private supabaseService = inject(SupabaseService);
 
@@ -34,6 +34,8 @@ export class ShowStateService {
   selectedShow = signal<TVShow | null>(null);
   /** Number of seasons selected in the season-picker modal. */
   seasonsToAdd = signal<number>(0);
+  /** Error/warning message when user attempts to add an unreleased season. */
+  seasonWarning = signal<string | null>(null);
 
   constructor() {
     // Listen for authentication changes to synchronize shows.
@@ -109,10 +111,10 @@ export class ShowStateService {
    * @param show - The show to display details for.
    */
   openDetails(show: TVShow): void {
-    if (show.summary) {
+    if (show.summary && show.seasons && show.seasons.length > 0) {
       this.activeShowForDetails.set(show);
     } else {
-      this.tvmaze.getShowDetails(show.id).subscribe(result => {
+      this.tmdb.getShowDetails(show.id).subscribe(result => {
         if (result) {
           this.activeShowForDetails.set(result);
         }
@@ -121,12 +123,12 @@ export class ShowStateService {
   }
 
   /**
-   * Opens the details modal by fetching a show by its TVMaze ID.
+   * Opens the details modal by fetching a show by its TMDB ID.
    * Used when navigating via URL query parameters (shareable links).
-   * @param showId - The TVMaze show ID.
+   * @param showId - The TMDB show ID.
    */
   openDetailsById(showId: number): void {
-    this.tvmaze.getShowDetails(showId).subscribe(result => {
+    this.tmdb.getShowDetails(showId).subscribe(result => {
       if (result) {
         this.activeShowForDetails.set(result);
       }
@@ -141,10 +143,12 @@ export class ShowStateService {
    */
   addDetailsShowToWatched(show: TVShow): void {
     this.activeShowForDetails.set(null);
-    this.tvmaze.getShowDetails(show.id).subscribe(result => {
+    this.seasonWarning.set(null);
+    this.tmdb.getShowDetails(show.id).subscribe(result => {
       if (result) {
         this.selectedShow.set(result);
         this.seasonsToAdd.set(0);
+        this.seasonWarning.set(null);
       }
     });
   }
@@ -158,6 +162,29 @@ export class ShowStateService {
   closeSeasonModal(): void {
     this.selectedShow.set(null);
     this.seasonsToAdd.set(0);
+    this.seasonWarning.set(null);
+  }
+
+  /** Checks if a specific season has already aired. */
+  isSeasonAired(seasonNumber: number): boolean {
+    const show = this.selectedShow();
+    if (!show || !show.seasons || show.seasons.length === 0) return true;
+    const s = show.seasons.find(season => season.season_number === seasonNumber);
+    return s ? s.is_aired !== false : true;
+  }
+
+  /** Selects a season or warns the user if that season has not been released yet. */
+  selectSeason(seasonNumber: number): void {
+    const show = this.selectedShow();
+    if (!show) return;
+    const seasonObj = show.seasons?.find(s => s.season_number === seasonNumber);
+    if (seasonObj && seasonObj.is_aired === false) {
+      const airMsg = seasonObj.air_date ? ` (airs on ${seasonObj.air_date})` : '';
+      this.seasonWarning.set(`Not possible to add Season ${seasonNumber} because it has not been released yet${airMsg}. Please select released seasons.`);
+      return;
+    }
+    this.seasonWarning.set(null);
+    this.seasonsToAdd.set(seasonNumber);
   }
 
   /**
@@ -168,6 +195,15 @@ export class ShowStateService {
     const show = this.selectedShow();
     const seasons = this.seasonsToAdd();
     if (!show || seasons === 0) return;
+
+    // Check if any of the selected seasons (1..seasons) are unreleased
+    const unreleased = show.seasons?.find(s => s.season_number <= seasons && s.is_aired === false);
+    if (unreleased) {
+      const airMsg = unreleased.air_date ? ` (airs on ${unreleased.air_date})` : '';
+      this.seasonWarning.set(`Not possible to add because Season ${unreleased.season_number} has not been released yet${airMsg}.`);
+      return;
+    }
+
     this.addWatchedShow(show, seasons);
     this.closeSeasonModal();
   }
@@ -201,10 +237,19 @@ export class ShowStateService {
    * @returns An object with total minutes and total episodes.
    */
   calculateTime(show: TVShow, seasonsWatched: number): { minutes: number; episodes: number } {
-    const runtime = show.episode_run_time || 45;
-    const episodes = show.seasons.length
-      ? show.seasons.slice(0, seasonsWatched).reduce((sum, s) => sum + s.episode_count, 0)
-      : seasonsWatched * 10;
+    let runtime = 45;
+    if (typeof show?.episode_run_time === 'number' && show.episode_run_time > 0) {
+      runtime = show.episode_run_time;
+    } else if (Array.isArray(show?.episode_run_time) && (show.episode_run_time as any).length > 0) {
+      runtime = Number((show.episode_run_time as any)[0]) || 45;
+    }
+
+    const seasons = show?.seasons || [];
+    const count = Math.max(1, seasonsWatched);
+    const episodes = seasons.length > 0
+      ? seasons.slice(0, count).reduce((sum, s) => sum + (s.episode_count || 10), 0)
+      : count * 10;
+
     return { minutes: Math.round(episodes * runtime), episodes };
   }
 
@@ -239,14 +284,27 @@ export class ShowStateService {
   }
 
   /**
+   * Returns the maximum number of seasons that have already aired for a show.
+   * Prevents adding unreleased upcoming seasons.
+   */
+  getMaxAiredSeasons(show: TVShow): number {
+    if (!show || !show.seasons || show.seasons.length === 0) {
+      return show?.number_of_seasons || 1;
+    }
+    const aired = show.seasons.filter(s => s.is_aired !== false);
+    return aired.length > 0 ? aired.length : 1;
+  }
+
+  /**
    * Increments or decrements the number of watched seasons for a show.
    * Recalculates time and episode totals accordingly.
    * @param item - The watched show entry to update.
    * @param delta - The change in seasons (+1 or -1).
    */
   changeSeason(item: WatchedShow, delta: number): void {
+    const maxAired = this.getMaxAiredSeasons(item.show);
     const newSeasons = item.seasonsWatched + delta;
-    if (newSeasons < 1 || newSeasons > item.show.number_of_seasons) return;
+    if (newSeasons < 1 || newSeasons > maxAired) return;
     const t = this.calculateTime(item.show, newSeasons);
 
     let updatedItem: WatchedShow | null = null;
@@ -376,9 +434,7 @@ export class ShowStateService {
   }
 
   /**
-   * Checks all watched shows for new episodes aired in the last 30 days
-   * by querying TVMaze's monthly updates endpoint and then fetching each
-   * changed show's episode list.
+   * Checks watched shows for recent episode updates.
    * Rate-limited to once every 24 hours unless forced.
    * @param force - If true, bypasses the 24-hour cooldown.
    */
@@ -395,39 +451,22 @@ export class ShowStateService {
 
     // Get unique show IDs from watchlist
     const uniqueShowIds = [...new Set(watched.map(w => w.show.id))];
-    const storedTimestamps: Record<string, number> = JSON.parse(localStorage.getItem('showUpdateTimestamps') || '{}');
 
-    this.tvmaze.getShowUpdates().subscribe(updates => {
-      // Filter to only our shows that had any change since we last checked
-      const changedShowIds = uniqueShowIds.filter(id => {
-        const remoteTs = updates[id.toString()];
-        const localTs = storedTimestamps[id.toString()] || 0;
-        return remoteTs && remoteTs > localTs;
-      });
+    // Check episodes for shows
+    const episodeRequests: Observable<NewEpisodeInfo[]>[] = uniqueShowIds.map(id => this.tmdb.getRecentEpisodes(id, 30));
 
-      if (changedShowIds.length === 0) {
-        // Nothing changed – update the check timestamp and stored timestamps
-        localStorage.setItem('lastUpdateCheck', now.toString());
-        uniqueShowIds.forEach(id => {
-          if (updates[id.toString()]) {
-            storedTimestamps[id.toString()] = updates[id.toString()];
-          }
-        });
-        localStorage.setItem('showUpdateTimestamps', JSON.stringify(storedTimestamps));
-        this.checkingForUpdates.set(false);
-        return;
-      }
+    if (episodeRequests.length === 0) {
+      this.checkingForUpdates.set(false);
+      return;
+    }
 
-      // Fetch recent episodes (last 30 days) for all changed shows in parallel
-      const episodeRequests = changedShowIds.map(id => this.tvmaze.getRecentEpisodes(id, 30));
-
-      forkJoin(episodeRequests).subscribe(episodeResults => {
+    forkJoin(episodeRequests).subscribe({
+      next: (results: NewEpisodeInfo[][]) => {
         const alerts: NewEpisodeAlert[] = [];
 
-        changedShowIds.forEach((showId, index) => {
-          const recentEps = episodeResults[index];
+        results.forEach((recentEps, index) => {
           if (recentEps.length === 0) return;
-
+          const showId = uniqueShowIds[index];
           const representative = watched.find(w => w.show.id === showId);
           if (!representative) return;
 
@@ -436,42 +475,23 @@ export class ShowStateService {
             showName: representative.show.name,
             posterPath: representative.show.poster_path,
             newEpisodeCount: recentEps.length,
-            newEpisodes: recentEps
+            newEpisodes: recentEps,
+            isUpcoming: recentEps.some(e => e.isUpcoming)
           });
-
-          // Update timestamps
-          if (updates[showId.toString()]) {
-            storedTimestamps[showId.toString()] = updates[showId.toString()];
-          }
         });
 
-        // Merge with existing alerts (update if show already has one)
-        const existingAlerts = this.newEpisodeAlerts();
-        const mergedAlerts = [...existingAlerts];
-        for (const alert of alerts) {
-          const idx = mergedAlerts.findIndex(a => a.showId === alert.showId);
-          if (idx === -1) {
-            mergedAlerts.push(alert);
-          } else {
-            mergedAlerts[idx] = alert;
-          }
-        }
-
-        this.newEpisodeAlerts.set(mergedAlerts);
+        this.newEpisodeAlerts.set(alerts);
         this.saveAlerts();
-
-        // Update all timestamps for our shows (also those without new episodes)
-        uniqueShowIds.forEach(id => {
-          if (updates[id.toString()] && !storedTimestamps[id.toString()]) {
-            storedTimestamps[id.toString()] = updates[id.toString()];
-          }
-        });
-        localStorage.setItem('showUpdateTimestamps', JSON.stringify(storedTimestamps));
         localStorage.setItem('lastUpdateCheck', now.toString());
         this.checkingForUpdates.set(false);
-      });
+      },
+      error: () => {
+        this.checkingForUpdates.set(false);
+      }
     });
   }
+
+
 
   /**
    * Dismisses a single new-episode alert by show ID.
@@ -564,10 +584,19 @@ export class ShowStateService {
   private loadFromStorage(): WatchedShow[] {
     try {
       const data = JSON.parse(localStorage.getItem('watchedShows') || '[]');
-      const list: WatchedShow[] = data.map((w: any) => ({
-        ...w,
-        instanceId: w.instanceId || w.show.id.toString() + '_' + Math.random().toString(36).substr(2, 5)
-      }));
+      const list: WatchedShow[] = data.map((w: any) => {
+        const item: WatchedShow = {
+          ...w,
+          instanceId: w.instanceId || w.show.id.toString() + '_' + Math.random().toString(36).substr(2, 5)
+        };
+        // Auto-repair if totalMinutes was 0 due to previous bug
+        if (!item.totalMinutes || item.totalMinutes <= 0) {
+          const t = this.calculateTime(item.show, item.seasonsWatched || 1);
+          item.totalMinutes = t.minutes;
+          item.episodesWatched = t.episodes;
+        }
+        return item;
+      });
       return this.sortByAddedAt(list);
     } catch {
       return [];

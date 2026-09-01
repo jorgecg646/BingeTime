@@ -91,7 +91,7 @@ import { ShowStateService } from '../../services/show-state.service';
                             <svg class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
                           </button>
                         }
-                        @if (item.seasonsWatched < item.show.number_of_seasons) {
+                        @if (item.seasonsWatched < state.getMaxAiredSeasons(item.show)) {
                           <button (click)="changeSeason.emit({ item, delta: 1 }); $event.stopPropagation()" class="p-0.5 sm:p-1.5 rounded bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 transition-all" title="Add season">
                             <svg class="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                           </button>

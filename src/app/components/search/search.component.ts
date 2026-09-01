@@ -3,7 +3,7 @@ import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
 import { TVShow } from '../../models';
-import { TvmazeService } from '../../services/tvmaze.service';
+import { TmdbService } from '../../services/tmdb.service';
 import { ShowStateService } from '../../services/show-state.service';
 
 @Component({
@@ -92,13 +92,25 @@ import { ShowStateService } from '../../services/show-state.service';
                     </div>
                   } @else {
                     <p class="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider mb-2">Seasons watched</p>
+                    
+                    @if (dropdownSeasonWarning) {
+                      <div class="mb-2.5 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-300 text-xs leading-snug">
+                        {{ dropdownSeasonWarning }}
+                      </div>
+                    }
+
                     <div class="flex flex-wrap gap-1.5 mb-3">
                       @for (season of searchDropdownSeasonNumbers; track season) {
                         <button
-                          (click)="searchDropdownSeasonsToAdd = season; $event.stopPropagation()"
-                          [class]="searchDropdownSeasonsToAdd === season ? 'bg-white text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'"
-                          class="w-9 h-9 rounded-lg text-sm font-semibold transition-all">
+                          (click)="selectDropdownSeason(season); $event.stopPropagation()"
+                          [class]="searchDropdownSeasonsToAdd === season 
+                            ? 'bg-white text-black font-bold' 
+                            : (isDropdownSeasonAired(season) ? 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white' : 'bg-white/5 text-amber-400/60 hover:bg-white/10 border border-dashed border-amber-500/30')"
+                          class="w-9 h-9 rounded-lg text-sm font-semibold transition-all relative">
                           {{ season }}
+                          @if (!isDropdownSeasonAired(season)) {
+                            <span class="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
+                          }
                         </button>
                       }
                     </div>
@@ -138,7 +150,7 @@ import { ShowStateService } from '../../services/show-state.service';
   `
 })
 export class SearchComponent implements OnInit, OnDestroy {
-  private tvmaze = inject(TvmazeService);
+  private tmdb = inject(TmdbService);
   state = inject(ShowStateService);
 
   /** Current text in the search input field. */
@@ -171,7 +183,7 @@ export class SearchComponent implements OnInit, OnDestroy {
       switchMap(query => {
         if (query.length < 2) return of([]);
         this.isLoading = true;
-        return this.tvmaze.searchShows(query);
+        return this.tmdb.searchShows(query);
       })
     ).subscribe(results => {
       this.searchResults = results;
@@ -209,14 +221,41 @@ export class SearchComponent implements OnInit, OnDestroy {
       return;
     }
     this.searchDropdownLoading = true;
+    this.dropdownSeasonWarning = null;
     this.activeSearchDropdownShow.set(null);
-    this.tvmaze.getShowDetails(show.id).subscribe(result => {
+    this.tmdb.getShowDetails(show.id).subscribe(result => {
       this.searchDropdownLoading = false;
       if (result) {
         this.activeSearchDropdownShow.set(result);
         this.searchDropdownSeasonsToAdd = 0;
+        this.dropdownSeasonWarning = null;
       }
     });
+  }
+
+  /** Warning message if user selects an unreleased season in dropdown. */
+  dropdownSeasonWarning: string | null = null;
+
+  /** Checks if a season in the inline dropdown has already aired. */
+  isDropdownSeasonAired(season: number): boolean {
+    const show = this.activeSearchDropdownShow();
+    if (!show || !show.seasons || show.seasons.length === 0) return true;
+    const s = show.seasons.find(item => item.season_number === season);
+    return s ? s.is_aired !== false : true;
+  }
+
+  /** Selects a season or sets a warning if unreleased. */
+  selectDropdownSeason(season: number): void {
+    const show = this.activeSearchDropdownShow();
+    if (!show) return;
+    const s = show.seasons?.find(item => item.season_number === season);
+    if (s && s.is_aired === false) {
+      const airMsg = s.air_date ? ` (airs on ${s.air_date})` : '';
+      this.dropdownSeasonWarning = `Season ${season} has not been released yet${airMsg}. Please select released seasons.`;
+      return;
+    }
+    this.dropdownSeasonWarning = null;
+    this.searchDropdownSeasonsToAdd = season;
   }
 
   /**
@@ -236,9 +275,18 @@ export class SearchComponent implements OnInit, OnDestroy {
   addSearchDropdownShow(): void {
     const show = this.activeSearchDropdownShow();
     if (!show || this.searchDropdownSeasonsToAdd === 0) return;
+
+    const unreleased = show.seasons?.find(s => s.season_number <= this.searchDropdownSeasonsToAdd && s.is_aired === false);
+    if (unreleased) {
+      const airMsg = unreleased.air_date ? ` (airs on ${unreleased.air_date})` : '';
+      this.dropdownSeasonWarning = `Cannot add: Season ${unreleased.season_number} has not been released yet${airMsg}.`;
+      return;
+    }
+
     this.state.addWatchedShow(show, this.searchDropdownSeasonsToAdd);
     this.activeSearchDropdownShow.set(null);
     this.searchDropdownSeasonsToAdd = 0;
+    this.dropdownSeasonWarning = null;
     this.closeDropdown();
   }
 

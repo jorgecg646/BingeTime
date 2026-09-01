@@ -2,7 +2,7 @@ import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TVShow } from '../../models';
-import { TvmazeService } from '../../services/tvmaze.service';
+import { TmdbService } from '../../services/tmdb.service';
 import { ShowStateService } from '../../services/show-state.service';
 
 /**
@@ -24,8 +24,11 @@ import { ShowStateService } from '../../services/show-state.service';
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
             </a>
             <div>
-              <h2 class="text-3xl font-extrabold text-white tracking-tight">Top Rated Productions</h2>
-              <p class="text-zinc-400 text-xs mt-1">Showing {{ topRatedRangeStart() }}-{{ topRatedRangeEnd() }} of {{ filteredTopRatedShows().length }} top rated productions</p>
+              <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                <span>Top 250 TV Series</span>
+                <span class="text-xs bg-amber-400/15 border border-amber-400/25 text-amber-300 font-bold px-2 py-0.5 rounded-full">TMDB All-Time</span>
+              </h2>
+              <p class="text-zinc-400 text-xs mt-1">Showing #{{ topRatedRangeStart() }} - #{{ topRatedRangeEnd() }} of the Top 250 highest-rated series of all time</p>
             </div>
           </div>
 
@@ -86,9 +89,9 @@ import { ShowStateService } from '../../services/show-state.service';
             </div>
             
             <!-- Clear Filters Button -->
-            @if (selectedGenre() || selectedDecade() || selectedRatingMin()) {
+            @if (selectedGenre() || selectedDecade() || selectedRatingMin() || selectedProvider()) {
               <button 
-                (click)="setFilter('genre', null); setFilter('decade', null); setFilter('rating', null)"
+                (click)="clearAllFilters()"
                 class="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all font-bold text-[10px] uppercase flex items-center gap-1">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 Clear Filters
@@ -96,6 +99,26 @@ import { ShowStateService } from '../../services/show-state.service';
             }
           </div>
 
+        </div>
+
+        <!-- Streaming Platform Filter Row -->
+        <div class="flex flex-wrap items-center gap-2 pt-5 pb-2">
+          <span class="text-xs font-black uppercase tracking-wider text-zinc-500 shrink-0 mr-1">Platform:</span>
+          @for (provider of providers; track provider.id) {
+            <button
+              (click)="selectProvider(provider.id)"
+              [class]="selectedProvider() === provider.id 
+                ? 'bg-white text-black font-bold shadow-xl shadow-white/10 scale-105 border-white' 
+                : 'bg-white/5 border border-white/10 text-zinc-200 hover:text-white hover:bg-white/10'"
+              class="px-3.5 py-1.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 shadow-sm border">
+              @if (provider.logo) {
+                <img [src]="provider.logo" alt="" class="w-5 h-5 rounded-lg object-cover shadow-sm shrink-0" />
+              } @else {
+                <span class="text-sm">✨</span>
+              }
+              <span>{{ provider.name }}</span>
+            </button>
+          }
         </div>
       </div>
 
@@ -145,16 +168,25 @@ import { ShowStateService } from '../../services/show-state.service';
     <!-- Reusable Series Card Template -->
     <ng-template #showCard let-show="show" let-i="index" let-delay="delay">
       <div class="group cursor-pointer animate-slide-up" [style.animation-delay]="i * delay + 'ms'" (click)="state.openDetails(show)">
-        <div class="relative aspect-[2/3] overflow-hidden rounded-xl shadow-md hover-lift mb-2">
+        <div class="relative aspect-[2/3] overflow-hidden rounded-2xl shadow-md hover-lift mb-2 border border-white/5 group-hover:border-white/20 transition-all">
           <img [src]="show.poster_path" [alt]="show.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           
+          <!-- Rank Badge -->
+          <div class="absolute top-2 left-2 z-20 flex items-center gap-1 font-black rounded-lg px-2 py-0.5 shadow-xl backdrop-blur-md text-xs border"
+               [class]="(show.rank || i + 1) === 1 ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-black border-amber-300 shadow-amber-500/30 font-black' : ((show.rank || i + 1) === 2 ? 'bg-gradient-to-r from-slate-200 to-zinc-400 text-black border-white shadow-zinc-400/30 font-black' : ((show.rank || i + 1) === 3 ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white border-amber-500 shadow-amber-700/30 font-black' : 'bg-black/85 text-zinc-200 border-white/10'))">
+            <span>#{{ show.rank || (topRatedRangeStart() + i) }}</span>
+            @if ((show.rank || topRatedRangeStart() + i) === 1) { <span>🥇</span> }
+            @if ((show.rank || topRatedRangeStart() + i) === 2) { <span>🥈</span> }
+            @if ((show.rank || topRatedRangeStart() + i) === 3) { <span>🥉</span> }
+          </div>
+
           @if (state.isWatched(show.id)) {
-            <div class="absolute top-2 left-2 w-7 h-7 bg-emerald-500/95 text-white rounded-full flex items-center justify-center border border-emerald-400/30 backdrop-blur-sm shadow-lg z-20 animate-fade-in" title="Watched">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+            <div class="absolute top-9 left-2 w-6 h-6 bg-emerald-500/95 text-white rounded-full flex items-center justify-center border border-emerald-400/30 backdrop-blur-sm shadow-lg z-20 animate-fade-in" title="Watched">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
             </div>
           } @else if (state.isInPending(show.id)) {
-            <div class="absolute top-2 left-2 w-7 h-7 bg-violet-600/95 text-white rounded-full flex items-center justify-center border border-violet-500/30 backdrop-blur-sm shadow-lg z-20 animate-fade-in" title="Pending">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div class="absolute top-9 left-2 w-6 h-6 bg-violet-600/95 text-white rounded-full flex items-center justify-center border border-violet-500/30 backdrop-blur-sm shadow-lg z-20 animate-fade-in" title="Pending">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
           }
 
@@ -202,13 +234,25 @@ import { ShowStateService } from '../../services/show-state.service';
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                   </div>
+
+                  @if (dropdownSeasonWarning) {
+                    <div class="mb-1.5 p-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-[9px] leading-tight">
+                      {{ dropdownSeasonWarning }}
+                    </div>
+                  }
+
                   <div class="grid grid-cols-4 gap-1">
                     @for (season of searchDropdownSeasonNumbers; track season) {
                       <button
-                        (click)="searchDropdownSeasonsToAdd = season; $event.stopPropagation()"
-                        [class]="searchDropdownSeasonsToAdd === season ? 'bg-blue-600 text-white font-bold' : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'"
-                        class="h-6 text-[10px] rounded transition-all">
+                        (click)="selectDropdownSeason(season); $event.stopPropagation()"
+                        [class]="searchDropdownSeasonsToAdd === season 
+                          ? 'bg-blue-600 text-white font-bold' 
+                          : (isDropdownSeasonAired(season) ? 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white' : 'bg-white/5 text-amber-400/60 hover:bg-white/10 border border-dashed border-amber-500/30')"
+                        class="h-6 text-[10px] rounded transition-all relative">
                         {{ season }}
+                        @if (!isDropdownSeasonAired(season)) {
+                          <span class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                        }
                       </button>
                     }
                   </div>
@@ -249,7 +293,7 @@ import { ShowStateService } from '../../services/show-state.service';
   `
 })
 export class TopSeriesComponent implements OnInit {
-  private tvmaze = inject(TvmazeService);
+  private tmdb = inject(TmdbService);
   state = inject(ShowStateService);
 
   /** Full list of top-rated shows fetched from the API. */
@@ -273,67 +317,109 @@ export class TopSeriesComponent implements OnInit {
   searchDropdownLoading = false;
 
   /**
-   * Computed list of shows after applying all active filters (genre, decade, rating).
-   * Re-evaluates automatically when any filter signal changes.
+   * Filtered list of shows matching the currently selected genre,
+   * decade, and minimum rating criteria.
    */
   filteredTopRatedShows = computed(() => {
-    let shows = this.topRatedShows();
-    
-    const genre = this.selectedGenre();
-    if (genre) {
-      shows = shows.filter(s => s.genres?.includes(genre));
+    let result = this.topRatedShows();
+    const g = this.selectedGenre();
+    const d = this.selectedDecade();
+    const r = this.selectedRatingMin();
+
+    if (g) {
+      const gLower = g.toLowerCase();
+      result = result.filter(s => s.genres && s.genres.some(genre => genre.toLowerCase().includes(gLower)));
     }
-    
-    const decade = this.selectedDecade();
-    if (decade) {
-      shows = shows.filter(s => {
-        const year = parseInt(s.first_air_date?.slice(0, 4));
-        if (isNaN(year)) return false;
-        if (decade === '2020s') return year >= 2020;
-        if (decade === '2010s') return year >= 2010 && year < 2020;
-        if (decade === '2000s') return year >= 2000 && year < 2010;
-        if (decade === '1990s') return year >= 1990 && year < 2000;
-        if (decade === 'Older') return year < 1990;
+    if (d) {
+      result = result.filter(s => {
+        if (!s.first_air_date) return false;
+        const year = parseInt(s.first_air_date.slice(0, 4), 10);
+        if (d === '2020s') return year >= 2020;
+        if (d === '2010s') return year >= 2010 && year < 2020;
+        if (d === '2000s') return year >= 2000 && year < 2010;
+        if (d === '1990s') return year >= 1990 && year < 2000;
+        if (d === '1980s') return year >= 1980 && year < 1990;
+        if (d === 'Pre-80s') return year < 1980;
         return true;
       });
     }
-    
-    const rating = this.selectedRatingMin();
-    if (rating) {
-      shows = shows.filter(s => s.rating !== null && s.rating >= rating);
+    if (r !== null) {
+      result = result.filter(s => s.rating !== null && s.rating >= r);
     }
-    
-    return shows;
+    return result;
   });
 
-  /** Total number of pages based on filtered results (49 items per page). */
-  topRatedTotalPages = computed(() => Math.max(1, Math.ceil(this.filteredTopRatedShows().length / 49)));
-  
-  /** Computed slice of shows for the current page. */
+  /** Total number of pages based on 50 items per page (5 pages for 250 shows). */
+  topRatedTotalPages = computed(() => Math.ceil(this.filteredTopRatedShows().length / 50));
+
+  /** Slice of shows to display on the current page (up to 50 shows). */
   topRatedPageShows = computed(() => {
     const page = this.topRatedCurrentPage();
-    const shows = this.filteredTopRatedShows();
-    return shows.slice((page - 1) * 49, page * 49);
+    const start = (page - 1) * 50;
+    return this.filteredTopRatedShows().slice(start, start + 50);
   });
 
   /** 1-based index of the first item on the current page. */
   topRatedRangeStart = computed(() => {
-    const total = this.filteredTopRatedShows().length;
-    if (total === 0) return 0;
-    return (this.topRatedCurrentPage() - 1) * 49 + 1;
+    if (this.filteredTopRatedShows().length === 0) return 0;
+    return (this.topRatedCurrentPage() - 1) * 50 + 1;
   });
 
   /** 1-based index of the last item on the current page. */
   topRatedRangeEnd = computed(() => {
-    return Math.min(this.topRatedCurrentPage() * 49, this.filteredTopRatedShows().length);
+    return Math.min(this.topRatedCurrentPage() * 50, this.filteredTopRatedShows().length);
   });
 
-  /** Fetches the top-rated shows from the API on component initialization. */
+  /** Fetches the top-rated 250 shows from the API on component initialization. */
   ngOnInit(): void {
-    this.tvmaze.getTopRatedShows().subscribe(shows => {
+    this.tmdb.getTop250Shows().subscribe(shows => {
       this.topRatedShows.set(shows);
       this.topRatedCurrentPage.set(1);
     });
+  }
+
+  /** Selected streaming watch provider ID (e.g. 8 for Netflix), or null for all. */
+  selectedProvider = signal<number | null>(null);
+
+  /** Popular streaming providers for quick filtering. */
+  providers = [
+    { id: 0, name: 'All Platforms', logo: null, color: 'text-white' },
+    { id: 8, name: 'Netflix', logo: 'https://image.tmdb.org/t/p/w92/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
+    { id: 1899, name: 'Max', logo: 'https://image.tmdb.org/t/p/w92/jbe4gVSfRlbPTdESXhEKpornsfu.jpg' },
+    { id: 337, name: 'Disney+', logo: 'https://image.tmdb.org/t/p/w92/97yvRBw1GzX7fXprcF80er19ot.jpg' },
+    { id: 9, name: 'Prime Video', logo: 'https://image.tmdb.org/t/p/w92/pvske1MyAoymrs5bguRfVqYiM9a.jpg' },
+    { id: 350, name: 'Apple TV+', logo: 'https://image.tmdb.org/t/p/w92/mcbz1LgtErU9p4UdbZ0rG6RTWHX.jpg' },
+    { id: 531, name: 'Paramount+', logo: 'https://image.tmdb.org/t/p/w92/fts6X10Jn4QT0X6ac3udKEn2tJA.jpg' },
+    { id: 15, name: 'Hulu', logo: 'https://image.tmdb.org/t/p/w92/bxBlRPEPpMVDc4jMhSrTf2339DW.jpg' },
+    { id: 386, name: 'Peacock', logo: 'https://image.tmdb.org/t/p/w92/2aGrp1xw3qhwCYvNGAJZPdjfeeX.jpg' },
+    { id: 283, name: 'Crunchyroll', logo: 'https://image.tmdb.org/t/p/w92/fzN5Jok5Ig1eJ7gyNGoMhnLSCfh.jpg' },
+    { id: 149, name: 'Movistar Plus+', logo: 'https://image.tmdb.org/t/p/w92/f6TRLB3H4jDpFEZ0z2KWSSvu1SB.jpg' },
+    { id: 1773, name: 'SkyShowtime', logo: 'https://image.tmdb.org/t/p/w92/h0ZYcYHicKQ4Ixm5nOjqvwni5NG.jpg' }
+  ];
+
+  /** Selects a streaming provider and loads top shows from it. */
+  selectProvider(providerId: number): void {
+    if (providerId === 0) {
+      this.selectedProvider.set(null);
+      this.tmdb.getTopRatedShows().subscribe(shows => {
+        this.topRatedShows.set(shows);
+        this.topRatedCurrentPage.set(1);
+      });
+    } else {
+      this.selectedProvider.set(providerId);
+      this.tmdb.getShowsByProvider(providerId).subscribe(shows => {
+        this.topRatedShows.set(shows);
+        this.topRatedCurrentPage.set(1);
+      });
+    }
+  }
+
+  /** Clears all applied filters including platform. */
+  clearAllFilters(): void {
+    this.selectedGenre.set(null);
+    this.selectedDecade.set(null);
+    this.selectedRatingMin.set(null);
+    this.selectProvider(0);
   }
 
   /**
@@ -364,14 +450,41 @@ export class TopSeriesComponent implements OnInit {
       return;
     }
     this.searchDropdownLoading = true;
+    this.dropdownSeasonWarning = null;
     this.activeSearchDropdownShow.set(null);
-    this.tvmaze.getShowDetails(show.id).subscribe(result => {
+    this.tmdb.getShowDetails(show.id).subscribe(result => {
       this.searchDropdownLoading = false;
       if (result) {
         this.activeSearchDropdownShow.set(result);
         this.searchDropdownSeasonsToAdd = 0;
+        this.dropdownSeasonWarning = null;
       }
     });
+  }
+
+  /** Warning message if user selects an unreleased season in dropdown. */
+  dropdownSeasonWarning: string | null = null;
+
+  /** Checks if a season in the inline dropdown has already aired. */
+  isDropdownSeasonAired(season: number): boolean {
+    const show = this.activeSearchDropdownShow();
+    if (!show || !show.seasons || show.seasons.length === 0) return true;
+    const s = show.seasons.find(item => item.season_number === season);
+    return s ? s.is_aired !== false : true;
+  }
+
+  /** Selects a season or sets a warning if unreleased. */
+  selectDropdownSeason(season: number): void {
+    const show = this.activeSearchDropdownShow();
+    if (!show) return;
+    const s = show.seasons?.find(item => item.season_number === season);
+    if (s && s.is_aired === false) {
+      const airMsg = s.air_date ? ` (airs on ${s.air_date})` : '';
+      this.dropdownSeasonWarning = `Season ${season} not released yet${airMsg}.`;
+      return;
+    }
+    this.dropdownSeasonWarning = null;
+    this.searchDropdownSeasonsToAdd = season;
   }
 
   /**
@@ -391,9 +504,18 @@ export class TopSeriesComponent implements OnInit {
   addSearchDropdownShow(): void {
     const show = this.activeSearchDropdownShow();
     if (!show || this.searchDropdownSeasonsToAdd === 0) return;
+
+    const unreleased = show.seasons?.find(s => s.season_number <= this.searchDropdownSeasonsToAdd && s.is_aired === false);
+    if (unreleased) {
+      const airMsg = unreleased.air_date ? ` (airs on ${unreleased.air_date})` : '';
+      this.dropdownSeasonWarning = `Season ${unreleased.season_number} not released yet${airMsg}.`;
+      return;
+    }
+
     this.state.addWatchedShow(show, this.searchDropdownSeasonsToAdd);
     this.activeSearchDropdownShow.set(null);
     this.searchDropdownSeasonsToAdd = 0;
+    this.dropdownSeasonWarning = null;
   }
 
   /**

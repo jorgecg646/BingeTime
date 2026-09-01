@@ -52,14 +52,14 @@ export class AppComponent implements OnInit, OnDestroy {
    */
   bgImages = computed(() => {
     const shows = this.state.watchedShows();
-    const defaultImage = 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253519.jpg';
+    const defaultImage = 'https://image.tmdb.org/t/p/original/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg';
     if (shows.length === 0) {
       return [defaultImage];
     }
     return shows
       .map(w => w.show.poster_path)
       .filter((path): path is string => !!path)
-      .map(path => path.replace('medium_portrait', 'original_untouched'));
+      .map(path => path.replace('/w500/', '/original/'));
   });
 
   /** URL of the first background image layer. */
