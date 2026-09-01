@@ -58,3 +58,6 @@ desktop.ini
 # TypeScript cache
 *.tsbuildinfo
 
+
+# Local Netlify folder
+.netlify

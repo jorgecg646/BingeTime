@@ -21,19 +21,19 @@ export class SupabaseService {
   }
 
   /**
-   * Fetches all watched shows for a user from the Serverless API.
+   * Fetches all watched and pending shows for a user in a single request.
    * @param userId - ID of the authenticated user
    */
-  async getWatchedShows(userId: string): Promise<WatchedShow[]> {
+  async getAllShows(userId: string): Promise<{ watched: WatchedShow[]; pending: PendingShow[] }> {
     try {
       const res = await firstValueFrom(
         this.http.get<{ watched: WatchedShow[]; pending: PendingShow[] }>(this.apiUrl, {
           headers: await this.getHeaders()
         })
       );
-      return res?.watched || [];
+      return { watched: res?.watched || [], pending: res?.pending || [] };
     } catch (error) {
-      console.error('Error fetching watched shows:', error);
+      console.error('Error fetching shows:', error);
       throw error;
     }
   }
@@ -74,24 +74,6 @@ export class SupabaseService {
       );
     } catch (error) {
       console.error('Error deleting watched show:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Fetches all pending shows for a user from Supabase.
-   * @param userId - ID of the authenticated user
-   */
-  async getPendingShows(userId: string): Promise<PendingShow[]> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<{ watched: WatchedShow[]; pending: PendingShow[] }>(this.apiUrl, {
-          headers: await this.getHeaders()
-        })
-      );
-      return res?.pending || [];
-    } catch (error) {
-      console.error('Error fetching pending shows:', error);
       throw error;
     }
   }

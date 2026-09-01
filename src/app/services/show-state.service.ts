@@ -60,10 +60,8 @@ export class ShowStateService {
   private async loadUserDataFromNeon(userId: string) {
     this.isSyncingFromNeon.set(true);
     try {
-      const [remoteWatched, remotePending] = await Promise.all([
-        this.supabaseService.getWatchedShows(userId),
-        this.supabaseService.getPendingShows(userId)
-      ]);
+      const { watched: remoteWatched, pending: remotePending } =
+        await this.supabaseService.getAllShows(userId);
 
       const localWatched = this.loadFromStorage();
       const localPending = this.loadPendingFromStorage();

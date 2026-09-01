@@ -21,6 +21,7 @@ const sendResponse = (statusCode, bodyObj) => {
     statusCode,
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS'
@@ -61,7 +62,7 @@ exports.handler = async (event, context) => {
       // Fetch both watched and pending shows for the user
       const [watchedRows, pendingRows] = await Promise.all([
         db`
-          SELECT instance_id, show_data, seasons_watched, total_minutes, episodes_watched, user_rating
+          SELECT instance_id, show_data, seasons_watched, total_minutes, episodes_watched, user_rating, created_at
           FROM watched_shows
           WHERE user_id = ${userId}
           ORDER BY created_at DESC
@@ -80,7 +81,8 @@ exports.handler = async (event, context) => {
         seasonsWatched: row.seasons_watched,
         totalMinutes: row.total_minutes,
         episodesWatched: row.episodes_watched,
-        userRating: row.user_rating
+        userRating: row.user_rating,
+        addedAt: row.created_at ? new Date(row.created_at).getTime() : undefined
       }));
 
       const pending = pendingRows.map(row => ({
