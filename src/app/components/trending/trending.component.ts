@@ -2,7 +2,7 @@ import { Component, inject, signal, computed, effect, OnInit, OnDestroy, output,
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
-import { TVShow } from '../../models';
+import { TVShow, ALL_GENRES, POPULAR_PROVIDERS, formatGenresLabel } from '../../models';
 import { TmdbService } from '../../services/tmdb.service';
 import { ShowStateService } from '../../services/show-state.service';
 
@@ -90,8 +90,13 @@ import { ShowStateService } from '../../services/show-state.service';
           </div>
 
           <!-- Sort & Dropdown Filters -->
-          <div class="flex flex-wrap items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2 relative">
             
+            @if (activeDropdown()) {
+              <!-- Backdrop dismisser -->
+              <div class="fixed inset-0 z-40 bg-transparent" (click)="activeDropdown.set(null)"></div>
+            }
+
             <!-- Sort By Selector -->
             <div class="relative">
               <button 
@@ -101,28 +106,49 @@ import { ShowStateService } from '../../services/show-state.service';
                 <svg class="w-3.5 h-3.5 text-zinc-500 transition-transform duration-200" [class.rotate-180]="activeDropdown() === 'sort'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
               </button>
               @if (activeDropdown() === 'sort') {
-                <div class="absolute right-0 mt-2 z-50 w-44 bg-zinc-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl p-1">
+                <div class="absolute top-full left-0 mt-2 z-50 w-44 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-1.5">
                   @for (opt of sortOptions; track opt.value) {
-                    <button (click)="setSort(opt.value)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5" [class.text-blue-400]="selectedSort() === opt.value">{{ opt.label }}</button>
+                    <button (click)="setSort(opt.value)" class="w-full text-left px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-between" [class.text-blue-400]="selectedSort() === opt.value">
+                      <span>{{ opt.label }}</span>
+                      @if (selectedSort() === opt.value) {
+                        <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                      }
+                    </button>
                   }
                 </div>
               }
             </div>
 
-            <!-- Genre Filter -->
+            <!-- Genre Filter (Multi-select) -->
             <div class="relative">
               <button 
                 (click)="activeDropdown.set(activeDropdown() === 'genre' ? null : 'genre')"
-                class="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 font-semibold text-xs">
-                <span>GENRE: {{ selectedGenre() || 'ALL' }}</span>
+                class="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 font-semibold text-xs"
+                [class.border-blue-500]="selectedGenres().length > 0"
+                [class.text-blue-400]="selectedGenres().length > 0">
+                <span>GENRES: {{ getGenreLabel() }}</span>
                 <svg class="w-3.5 h-3.5 text-zinc-500 transition-transform duration-200" [class.rotate-180]="activeDropdown() === 'genre'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
               </button>
               @if (activeDropdown() === 'genre') {
-                <div class="absolute right-0 mt-2 z-50 w-48 bg-zinc-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl p-1 max-h-64 overflow-y-auto">
-                  <button (click)="setGenre(null)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5">All Genres</button>
-                  @for (genre of ['Action & Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary', 'Drama', 'Family', 'Kids', 'Mystery', 'News', 'Reality', 'Sci-Fi & Fantasy', 'Soap', 'Talk', 'War & Politics', 'Western']; track genre) {
-                    <button (click)="setGenre(genre)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5" [class.text-blue-400]="selectedGenre() === genre">{{ genre }}</button>
-                  }
+                <div class="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 z-50 w-64 max-w-[calc(100vw-2.5rem)] bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-2.5 max-h-80 flex flex-col">
+                  <div class="flex items-center justify-between pb-2 mb-1.5 border-b border-white/10 px-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Select Genres</span>
+                    @if (selectedGenres().length > 0) {
+                      <button (click)="clearGenres()" class="text-[10px] text-red-400 hover:text-red-300 font-bold px-1.5 py-0.5 rounded bg-red-500/10">Reset</button>
+                    }
+                  </div>
+                  <div class="overflow-y-auto space-y-0.5 custom-scrollbar pr-1 flex-1">
+                    @for (genre of allGenres; track genre) {
+                      <button 
+                        (click)="toggleGenre(genre)" 
+                        [class]="isGenreSelected(genre) ? 'w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors bg-blue-600/20 text-blue-400' : 'w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors text-zinc-300 hover:bg-white/5'">
+                        <span>{{ genre }}</span>
+                        @if (isGenreSelected(genre)) {
+                          <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                        }
+                      </button>
+                    }
+                  </div>
                 </div>
               }
             </div>
@@ -136,11 +162,43 @@ import { ShowStateService } from '../../services/show-state.service';
                 <svg class="w-3.5 h-3.5 text-zinc-500 transition-transform duration-200" [class.rotate-180]="activeDropdown() === 'decade'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
               </button>
               @if (activeDropdown() === 'decade') {
-                <div class="absolute right-0 mt-2 z-50 w-40 bg-zinc-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl p-1">
-                  <button (click)="setDecade(null)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5">All Years</button>
+                <div class="absolute top-full left-0 mt-2 z-50 w-44 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-1.5">
+                  <button (click)="setDecade(null)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-between">
+                    <span>All Years</span>
+                    @if (!selectedDecade()) {
+                      <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    }
+                  </button>
                   @for (dec of ['2020s', '2010s', '2000s', '1990s', 'Older']; track dec) {
-                    <button (click)="setDecade(dec)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5" [class.text-blue-400]="selectedDecade() === dec">{{ dec }}</button>
+                    <button (click)="setDecade(dec)" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white hover:bg-white/5 flex items-center justify-between" [class.text-blue-400]="selectedDecade() === dec">
+                      <span>{{ dec }}</span>
+                      @if (selectedDecade() === dec) {
+                        <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                      }
+                    </button>
                   }
+                </div>
+              }
+            </div>
+
+            <!-- Format / Miniseries Filter -->
+            <div class="relative">
+              <button 
+                (click)="activeDropdown.set(activeDropdown() === 'type' ? null : 'type')"
+                class="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 text-zinc-300 hover:text-white transition-all flex items-center gap-1.5 font-semibold text-xs"
+                [class.border-blue-500]="selectedType() !== 'all'"
+                [class.text-blue-400]="selectedType() !== 'all'">
+                <span>FORMAT: {{ getTypeLabel() }}</span>
+                <svg class="w-3.5 h-3.5 text-zinc-500 transition-transform duration-200" [class.rotate-180]="activeDropdown() === 'type'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              </button>
+              @if (activeDropdown() === 'type') {
+                <div class="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 z-50 w-48 max-w-[calc(100vw-2.5rem)] bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-1.5">
+                  <button (click)="setType('all')" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold hover:text-white hover:bg-white/5" [class.text-blue-400]="selectedType() === 'all'" [class.text-zinc-400]="selectedType() !== 'all'">All Formats</button>
+                  <button (click)="setType('miniseries')" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold hover:text-white hover:bg-white/5 flex items-center justify-between" [class.text-blue-400]="selectedType() === 'miniseries'" [class.text-zinc-400]="selectedType() !== 'miniseries'">
+                    <span>⏱️ Miniseries</span>
+                    <span class="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">1 Season</span>
+                  </button>
+                  <button (click)="setType('series')" class="w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold hover:text-white hover:bg-white/5" [class.text-blue-400]="selectedType() === 'series'" [class.text-zinc-400]="selectedType() !== 'series'">📺 Standard Series</button>
                 </div>
               }
             </div>
@@ -154,7 +212,7 @@ import { ShowStateService } from '../../services/show-state.service';
               <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
 
-            @if (selectedGenre() || selectedDecade() || selectedProvider() || selectedSort() !== 'popularity.desc') {
+            @if (selectedGenres().length > 0 || selectedDecade() || selectedProvider() || selectedType() !== 'all' || selectedSort() !== 'popularity.desc') {
               <button 
                 (click)="resetFilters()"
                 class="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all font-bold text-[10px] uppercase flex items-center gap-1">
@@ -405,25 +463,14 @@ export class TrendingComponent implements OnInit, OnDestroy {
   /** Filters signals. */
   selectedProvider = signal<number | null>(null);
   selectedSort = signal<string>('popularity.desc');
-  selectedGenre = signal<string | null>(null);
+  selectedGenres = signal<string[]>([]);
   selectedDecade = signal<string | null>(null);
+  selectedType = signal<'all' | 'miniseries' | 'series'>('all');
 
-  activeDropdown = signal<'sort' | 'genre' | 'decade' | null>(null);
+  activeDropdown = signal<'sort' | 'genre' | 'decade' | 'type' | null>(null);
 
-  providers = [
-    { id: 0, name: 'All Platforms', logo: null, color: 'text-white' },
-    { id: 8, name: 'Netflix', logo: 'https://image.tmdb.org/t/p/w92/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
-    { id: 1899, name: 'Max', logo: 'https://image.tmdb.org/t/p/w92/jbe4gVSfRlbPTdESXhEKpornsfu.jpg' },
-    { id: 337, name: 'Disney+', logo: 'https://image.tmdb.org/t/p/w92/97yvRBw1GzX7fXprcF80er19ot.jpg' },
-    { id: 9, name: 'Prime Video', logo: 'https://image.tmdb.org/t/p/w92/pvske1MyAoymrs5bguRfVqYiM9a.jpg' },
-    { id: 350, name: 'Apple TV+', logo: 'https://image.tmdb.org/t/p/w92/mcbz1LgtErU9p4UdbZ0rG6RTWHX.jpg' },
-    { id: 531, name: 'Paramount+', logo: 'https://image.tmdb.org/t/p/w92/fts6X10Jn4QT0X6ac3udKEn2tJA.jpg' },
-    { id: 15, name: 'Hulu', logo: 'https://image.tmdb.org/t/p/w92/bxBlRPEPpMVDc4jMhSrTf2339DW.jpg' },
-    { id: 386, name: 'Peacock', logo: 'https://image.tmdb.org/t/p/w92/2aGrp1xw3qhwCYvNGAJZPdjfeeX.jpg' },
-    { id: 283, name: 'Crunchyroll', logo: 'https://image.tmdb.org/t/p/w92/fzN5Jok5Ig1eJ7gyNGoMhnLSCfh.jpg' },
-    { id: 149, name: 'Movistar Plus+', logo: 'https://image.tmdb.org/t/p/w92/f6TRLB3H4jDpFEZ0z2KWSSvu1SB.jpg' },
-    { id: 1773, name: 'SkyShowtime', logo: 'https://image.tmdb.org/t/p/w92/h0ZYcYHicKQ4Ixm5nOjqvwni5NG.jpg' }
-  ];
+  allGenres = ALL_GENRES;
+  providers = POPULAR_PROVIDERS;
 
   sortOptions = [
     { label: '🔥 Most Popular', value: 'popularity.desc' },
@@ -504,8 +551,9 @@ export class TrendingComponent implements OnInit, OnDestroy {
       page: this.currentPage(),
       sortBy: this.selectedSort(),
       providerId: this.selectedProvider(),
-      genreName: this.selectedGenre(),
-      decade: this.selectedDecade()
+      genreNames: this.selectedGenres(),
+      decade: this.selectedDecade(),
+      typeFilter: this.selectedType() === 'all' ? null : this.selectedType()
     }).subscribe(res => {
       this.loading.set(false);
       this.shows.set(res.shows);
@@ -518,6 +566,45 @@ export class TrendingComponent implements OnInit, OnDestroy {
     return opt ? opt.label : 'Popularity';
   }
 
+  getGenreLabel(): string {
+    return formatGenresLabel(this.selectedGenres());
+  }
+
+  isGenreSelected(genre: string): boolean {
+    return this.selectedGenres().includes(genre);
+  }
+
+  toggleGenre(genre: string): void {
+    const curr = this.selectedGenres();
+    if (curr.includes(genre)) {
+      this.selectedGenres.set(curr.filter(g => g !== genre));
+    } else {
+      this.selectedGenres.set([...curr, genre]);
+    }
+    this.currentPage.set(1);
+    this.loadCatalog();
+  }
+
+  clearGenres(): void {
+    this.selectedGenres.set([]);
+    this.currentPage.set(1);
+    this.loadCatalog();
+  }
+
+  getTypeLabel(): string {
+    const type = this.selectedType();
+    if (type === 'miniseries') return '⏱️ Miniseries';
+    if (type === 'series') return '📺 Series';
+    return 'ALL';
+  }
+
+  setType(type: 'all' | 'miniseries' | 'series'): void {
+    this.selectedType.set(type);
+    this.activeDropdown.set(null);
+    this.currentPage.set(1);
+    this.loadCatalog();
+  }
+
   selectProvider(id: number): void {
     this.selectedProvider.set(id === 0 ? null : id);
     this.currentPage.set(1);
@@ -526,13 +613,6 @@ export class TrendingComponent implements OnInit, OnDestroy {
 
   setSort(sort: string): void {
     this.selectedSort.set(sort);
-    this.activeDropdown.set(null);
-    this.currentPage.set(1);
-    this.loadCatalog();
-  }
-
-  setGenre(genre: string | null): void {
-    this.selectedGenre.set(genre);
     this.activeDropdown.set(null);
     this.currentPage.set(1);
     this.loadCatalog();
@@ -549,8 +629,9 @@ export class TrendingComponent implements OnInit, OnDestroy {
     this.searchQuery = '';
     this.selectedProvider.set(null);
     this.selectedSort.set('popularity.desc');
-    this.selectedGenre.set(null);
+    this.selectedGenres.set([]);
     this.selectedDecade.set(null);
+    this.selectedType.set('all');
     this.currentPage.set(1);
     this.loadCatalog();
   }

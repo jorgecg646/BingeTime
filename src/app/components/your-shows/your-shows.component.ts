@@ -27,7 +27,7 @@ import { ShowStateService } from '../../services/show-state.service';
              [class]="showCollapseControls() && !isExpanded() ? 'max-h-[220px] sm:max-h-[280px] md:max-h-[380px] overflow-hidden' : ''">
           
           <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0 rounded-2xl overflow-hidden shadow-2xl border border-white/5">
-            @for (item of watchedShows(); track item.instanceId; let i = $index) {
+            @for (item of sortedWatchedShows(); track item.instanceId; let i = $index) {
               <div class="relative aspect-[2/3] overflow-hidden group animate-slide-up cursor-pointer" 
                    (click)="openDetails.emit(item.show)"
                    [style.animation-delay]="i * 50 + 'ms'">
@@ -65,7 +65,7 @@ import { ShowStateService } from '../../services/show-state.service';
                       <div class="text-[9px] sm:text-xs text-zinc-400 mt-0.5">{{ item.show.first_air_date | slice:0:4 }}</div>
                     </div>
                     <button (click)="removeShow.emit(item.instanceId); $event.stopPropagation()" class="p-1 rounded bg-white/5 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0 animate-fade-in" title="Delete show">
-                      <svg class="w-3 h-3 sm:w-4.5 sm:h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                   </div>
                   
@@ -150,6 +150,10 @@ export class YourShowsComponent {
   state = inject(ShowStateService);
 
   watchedShows = input.required<WatchedShow[]>();
+
+  sortedWatchedShows = computed(() => {
+    return this.state.sortByAddedAt(this.watchedShows());
+  });
 
   openDetails = output<TVShow>();
   changeSeason = output<{ item: WatchedShow; delta: number }>();

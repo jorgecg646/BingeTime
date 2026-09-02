@@ -1,8 +1,8 @@
-import { Component, input, output, inject, computed, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, input, output, inject, computed, signal, effect, ChangeDetectionStrategy } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { TVShow } from '../../models';
+import { TVShow, SeasonDetail } from '../../models';
 import { ShowStateService } from '../../services/show-state.service';
 import { TmdbService } from '../../services/tmdb.service';
 
@@ -193,19 +193,139 @@ import { TmdbService } from '../../services/tmdb.service';
                       
                       <div #castList class="flex gap-3 overflow-x-auto pb-2 scroll-smooth no-scrollbar" style="contain: content;">
                         @for (actor of show()!.cast; track actor.id) {
-                          <div class="flex-none w-24 text-center group">
-                            <div class="w-20 h-20 mx-auto rounded-full overflow-hidden mb-1.5 border border-white/10 shadow-sm bg-white/5">
+                          <div 
+                            (click)="openPerson(actor.id)"
+                            class="flex-none w-24 text-center group cursor-pointer"
+                            [title]="'View ' + actor.name + ' Profile & Filmography'">
+                            <div class="w-20 h-20 mx-auto rounded-full overflow-hidden mb-1.5 border border-white/10 group-hover:border-blue-400/80 shadow-sm bg-white/5 transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-blue-500/20">
                               @if (actor.profile_path) {
-                                <img [src]="actor.profile_path" [alt]="actor.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                <img [src]="actor.profile_path" [alt]="actor.name" class="w-full h-full object-cover" loading="lazy" />
                               } @else {
                                 <div class="w-full h-full flex items-center justify-center text-zinc-500 text-xs font-bold">No photo</div>
                               }
                             </div>
-                            <p class="text-white text-[11px] font-bold truncate">{{ actor.name }}</p>
+                            <p class="text-white text-[11px] font-bold truncate group-hover:text-blue-400 transition-colors">{{ actor.name }}</p>
                             <p class="text-zinc-500 text-[10px] truncate">{{ actor.character }}</p>
                           </div>
                         }
                       </div>
+                    </div>
+                  }
+
+                  <!-- 🎬 Horizontal Episodes Carousel (Like More Like This) -->
+                  @if (show()!.seasons && show()!.seasons.length > 0) {
+                    <div class="mt-8 pt-6 border-t border-white/10">
+                      
+                      <!-- Header with Season Picker & Carousel Navigation -->
+                      <div class="flex items-center justify-between gap-3 mb-4">
+                        <div class="flex items-center gap-3">
+                          <h4 class="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
+                            <span>🎬 Episodes</span>
+                          </h4>
+
+                          <!-- Season Picker Dropdown -->
+                          <div class="relative inline-block">
+                            <select 
+                              [ngModel]="selectedSeasonNumber()" 
+                              (ngModelChange)="selectSeason(+$event)"
+                              class="appearance-none bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs py-1.5 pl-3 pr-8 rounded-xl border border-white/20 hover:border-white/40 focus:outline-none cursor-pointer shadow-md">
+                              @for (season of show()!.seasons; track season.season_number) {
+                                <option [ngValue]="season.season_number" class="bg-zinc-900 text-white py-1">
+                                  Season {{ season.season_number }} ({{ season.episode_count }} eps)
+                                </option>
+                              }
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-zinc-400">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Left / Right Carousel Scroll Buttons -->
+                        <div class="flex items-center gap-1.5">
+                          <button (click)="scrollEpisodes(-360)" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white transition-all shadow-sm" title="Previous Episodes">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                          </button>
+                          <button (click)="scrollEpisodes(360)" class="p-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white transition-all shadow-sm" title="Next Episodes">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Loading State -->
+                      @if (loadingSeason()) {
+                        <div class="flex flex-col items-center justify-center py-12 text-center">
+                          <svg class="animate-spin h-7 w-7 text-amber-400 mb-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <p class="text-zinc-400 text-xs font-semibold">Loading season episodes...</p>
+                        </div>
+                      } @else if (currentSeasonDetail() && currentSeasonDetail()!.episodes.length > 0) {
+                        
+                        <!-- Horizontal Scrollable Episodes Carousel -->
+                        <div id="episodesCarouselList" class="flex gap-4 overflow-x-auto pb-3 scroll-smooth no-scrollbar" style="contain: content;">
+                          @for (ep of currentSeasonDetail()!.episodes; track ep.id) {
+                            <div class="flex-none w-72 sm:w-80 group rounded-2xl bg-zinc-950/70 hover:bg-zinc-900 border border-white/10 hover:border-white/25 p-3 flex flex-col justify-between shadow-xl transition-all">
+                              
+                              <div>
+                                <!-- Panoramic Episode Thumbnail -->
+                                <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-zinc-900 border border-white/10 shadow mb-3">
+                                  @if (ep.still_path) {
+                                    <img [src]="ep.still_path" [alt]="ep.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                                  } @else {
+                                    <div class="w-full h-full flex flex-col items-center justify-center text-zinc-600 bg-zinc-900">
+                                      <svg class="w-7 h-7 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                      <span class="text-[9px] mt-1 text-zinc-500">No preview</span>
+                                    </div>
+                                  }
+
+                                  <!-- Episode Number Badge -->
+                                  <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[11px] font-black text-white border border-white/10">
+                                    E{{ ep.episode_number }}
+                                  </div>
+
+                                  <!-- Duration Badge -->
+                                  @if (ep.runtime) {
+                                    <div class="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[10px] font-semibold text-zinc-200 border border-white/10">
+                                      {{ ep.runtime }}m
+                                    </div>
+                                  }
+                                </div>
+
+                                <!-- Episode Name & Air Date -->
+                                <div class="flex items-start justify-between gap-1 mb-1">
+                                  <h5 class="text-white text-sm font-bold truncate leading-tight group-hover:text-amber-400 transition-colors">
+                                    {{ ep.episode_number }}. {{ ep.name }}
+                                  </h5>
+                                  @if (ep.vote_average) {
+                                    <span class="text-amber-400 text-[11px] font-bold shrink-0 flex items-center gap-0.5">
+                                      ★ {{ ep.vote_average }}
+                                    </span>
+                                  }
+                                </div>
+
+                                @if (ep.air_date) {
+                                  <p class="text-zinc-500 text-[10px] font-medium">
+                                    {{ ep.air_date }}
+                                  </p>
+                                }
+
+                                <!-- Overview -->
+                                <p class="text-zinc-400 text-xs mt-2 line-clamp-3 leading-relaxed">
+                                  {{ ep.overview || 'No synopsis available for this episode.' }}
+                                </p>
+                              </div>
+
+                            </div>
+                          }
+                        </div>
+
+                      } @else {
+                        <p class="text-zinc-500 text-sm italic py-6 text-center bg-white/[0.02] rounded-2xl border border-white/5">
+                          No episodes details available for this season.
+                        </p>
+                      }
                     </div>
                   }
                 </div>
@@ -367,6 +487,36 @@ export class ShowDetailsModalComponent {
   /** Emits the show when the user wants to add it (or add again) to their watchlist. */
   addAgain = output<TVShow>();
 
+  /** Currently selected season number in the episodes guide. */
+  selectedSeasonNumber = signal<number>(1);
+  /** Detailed episode list for currently selected season. */
+  currentSeasonDetail = signal<SeasonDetail | null>(null);
+  /** Loading state for season episode details. */
+  loadingSeason = signal<boolean>(false);
+
+  constructor() {
+    effect(() => {
+      const s = this.show();
+      if (s && s.seasons && s.seasons.length > 0) {
+        const firstSeason = s.seasons[0]?.season_number || 1;
+        this.selectSeason(firstSeason);
+      } else {
+        this.currentSeasonDetail.set(null);
+      }
+    });
+  }
+
+  selectSeason(seasonNumber: number): void {
+    const s = this.show();
+    if (!s) return;
+    this.selectedSeasonNumber.set(seasonNumber);
+    this.loadingSeason.set(true);
+    this.tmdb.getSeasonDetails(s.id, seasonNumber).subscribe(detail => {
+      this.loadingSeason.set(false);
+      this.currentSeasonDetail.set(detail);
+    });
+  }
+
   /**
    * Computed list of streaming platforms for the currently selected country.
    */
@@ -394,6 +544,14 @@ export class ShowDetailsModalComponent {
   scrollCarousel(element: HTMLElement, offset: number): void {
     if (element) {
       element.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  }
+
+  /** Smoothly scrolls the episodes carousel by the given pixel offset. */
+  scrollEpisodes(offset: number): void {
+    const el = document.getElementById('episodesCarouselList');
+    if (el) {
+      el.scrollBy({ left: offset, behavior: 'smooth' });
     }
   }
 
@@ -442,5 +600,13 @@ export class ShowDetailsModalComponent {
       this.copied.set(true);
       setTimeout(() => this.copied.set(false), 2000);
     });
+  }
+
+  /**
+   * Opens the full biographical profile & TV filmography modal for an actor or creator.
+   * @param personId - TMDB Person ID.
+   */
+  openPerson(personId: number): void {
+    this.tmdb.openPersonModal(personId);
   }
 }

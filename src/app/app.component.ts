@@ -6,11 +6,12 @@ import { ShowDetailsModalComponent } from './components/show-details-modal/show-
 import { AuthService } from './services/auth.service';
 import { AdsenseComponent } from './components/adsense/adsense.component';
 import { RegionModalComponent } from './components/region-modal/region-modal.component';
+import { PersonModalComponent } from './components/person-modal/person-modal.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ShowDetailsModalComponent, AdsenseComponent, RegionModalComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ShowDetailsModalComponent, AdsenseComponent, RegionModalComponent, PersonModalComponent],
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit, OnDestroy {

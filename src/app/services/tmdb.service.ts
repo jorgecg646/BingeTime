@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of, forkJoin, map, catchError } from 'rxjs';
-import { TVShow, Season, NewEpisodeInfo, WatchProvider } from '../models';
+import { TVShow, Season, NewEpisodeInfo, WatchProvider, SeasonDetail, EpisodeDetail, PersonDetail, PersonTvCreditShow } from '../models';
 import { environment } from '../../environments/environment';
 
 // Genre ID to Name mapping for TMDB TV genres
@@ -83,12 +83,15 @@ export class TmdbService {
   private imageBaseUrl = environment.tmdbImageBaseUrl || 'https://image.tmdb.org/t/p';
   private topRatedShowsCache: TVShow[] | null = null;
   private showDetailsCache = new Map<number, TVShow>();
+  private seasonDetailsCache = new Map<string, SeasonDetail>();
+  private personDetailsCache = new Map<number, PersonDetail>();
   private discoverCache = new Map<string, { page: number; totalPages: number; totalResults: number; shows: TVShow[] }>();
   private trendingCache: TVShow[] | null = null;
 
   readonly COUNTRIES = SUPPORTED_COUNTRIES;
   readonly selectedCountry = signal<string>(this.getInitialCountryCode());
   readonly isRegionModalOpen = signal<boolean>(false);
+  readonly activePersonModalId = signal<number | null>(null);
 
   readonly activeCountry = this.selectedCountry.asReadonly();
   readonly activeCountryInfo = computed(() => {
@@ -104,6 +107,14 @@ export class TmdbService {
 
   closeRegionModal(): void {
     this.isRegionModalOpen.set(false);
+  }
+
+  openPersonModal(personId: number): void {
+    this.activePersonModalId.set(personId);
+  }
+
+  closePersonModal(): void {
+    this.activePersonModalId.set(null);
   }
 
   private getInitialCountryCode(): string {
@@ -158,6 +169,17 @@ export class TmdbService {
     return params;
   }
 
+  /** Helper to build HttpParams from a simple object map including auth parameters. */
+  private createParams(obj: Record<string, string | number | boolean | undefined>): HttpParams {
+    let params = new HttpParams();
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined && value !== null) {
+        params = params.set(key, String(value));
+      }
+    }
+    return this.addAuthParams(params);
+  }
+
   getUserCountryCode(): string {
     return this.selectedCountry();
   }
@@ -171,21 +193,18 @@ export class TmdbService {
     const trimmed = query.trim();
     if (!trimmed) return of([]);
 
-    let params = new HttpParams()
-      .set('query', trimmed)
-      .set('language', 'en-US')
-      .set('include_adult', 'false')
-      .set('page', '1');
-    params = this.addAuthParams(params);
+    const params = this.createParams({
+      query: trimmed,
+      language: 'en-US',
+      include_adult: 'false',
+      page: '1'
+    });
 
     return this.http.get<any>(`${this.baseUrl}/search/tv`, {
       headers: this.getHeaders(),
       params
     }).pipe(
-      map(res => {
-        const results = res.results || [];
-        return results.map((item: any) => this.mapShow(item));
-      }),
+      map(res => (res.results || []).map((item: any) => this.mapShow(item))),
       catchError(err => {
         console.error('TMDB search error:', err);
         return of([]);
@@ -205,11 +224,11 @@ export class TmdbService {
       return of(this.showDetailsCache.get(showId)!);
     }
 
-    let params = new HttpParams()
-      .set('language', 'en-US')
-      .set('append_to_response', 'watch/providers,videos,recommendations,reviews,credits')
-      .set('include_video_language', 'en,null,es');
-    params = this.addAuthParams(params);
+    const params = this.createParams({
+      language: 'en-US',
+      append_to_response: 'watch/providers,videos,recommendations,reviews,credits',
+      include_video_language: 'en,null,es'
+    });
 
     return this.http.get<any>(`${this.baseUrl}/tv/${showId}`, {
       headers: this.getHeaders(),
@@ -338,14 +357,18 @@ export class TmdbService {
     );
   }
 
+  private topRatedShowsCacheByType = new Map<string, TVShow[]>();
+
   /**
    * Fetches the Top 250 highest-rated TV shows of all time from TMDB.
+   * Can be filtered by format: 'all', 'miniseries' (with_type=2), or 'series' (with_type=4).
    * Uses vote_count.gte threshold to ensure high-quality, reputable ranking.
    * Assigns rank #1 to #250.
    */
-  getTop250Shows(): Observable<TVShow[]> {
-    if (this.topRatedShowsCache && this.topRatedShowsCache.length >= 250) {
-      return of(this.topRatedShowsCache);
+  getTop250Shows(typeFilter: 'all' | 'miniseries' | 'series' = 'all'): Observable<TVShow[]> {
+    const cacheKey = typeFilter || 'all';
+    if (this.topRatedShowsCacheByType.has(cacheKey)) {
+      return of(this.topRatedShowsCacheByType.get(cacheKey)!);
     }
 
     const pages = Array.from({ length: 13 }, (_, i) => i + 1);
@@ -353,8 +376,15 @@ export class TmdbService {
       let params = new HttpParams()
         .set('language', 'en-US')
         .set('sort_by', 'vote_average.desc')
-        .set('vote_count.gte', '200')
+        .set('vote_count.gte', typeFilter === 'miniseries' ? '100' : '200')
         .set('page', page.toString());
+
+      if (typeFilter === 'miniseries') {
+        params = params.set('with_type', '2');
+      } else if (typeFilter === 'series') {
+        params = params.set('with_type', '4');
+      }
+
       params = this.addAuthParams(params);
 
       return this.http.get<any>(`${this.baseUrl}/discover/tv`, {
@@ -382,7 +412,7 @@ export class TmdbService {
           return show;
         });
 
-        this.topRatedShowsCache = top250;
+        this.topRatedShowsCacheByType.set(cacheKey, top250);
         return top250;
       }),
       catchError(err => {
@@ -401,8 +431,10 @@ export class TmdbService {
     sortBy?: string;
     providerId?: number | null;
     genreName?: string | null;
+    genreNames?: string[] | null;
     decade?: string | null;
     minRating?: number | null;
+    typeFilter?: 'all' | 'miniseries' | 'series' | null;
   }): Observable<{ page: number; totalPages: number; totalResults: number; shows: TVShow[] }> {
     const cacheKey = JSON.stringify(options);
     if (this.discoverCache.has(cacheKey)) {
@@ -415,12 +447,25 @@ export class TmdbService {
       .set('page', page.toString())
       .set('sort_by', options.sortBy || 'popularity.desc');
 
+    if (options.typeFilter === 'miniseries') {
+      params = params.set('with_type', '2');
+    } else if (options.typeFilter === 'series') {
+      params = params.set('with_type', '4');
+    }
+
     if (options.providerId) {
       params = params
         .set('with_watch_providers', options.providerId.toString())
         .set('watch_region', this.getUserCountryCode());
     }
-    if (options.genreName) {
+    if (options.genreNames && options.genreNames.length > 0) {
+      const genreIds = options.genreNames.map(name => {
+        return Object.keys(TMDB_GENRES).find(k => TMDB_GENRES[+k].toLowerCase() === name.toLowerCase());
+      }).filter(Boolean);
+      if (genreIds.length > 0) {
+        params = params.set('with_genres', genreIds.join(','));
+      }
+    } else if (options.genreName) {
       const genreId = Object.keys(TMDB_GENRES).find(k => TMDB_GENRES[+k].toLowerCase() === options.genreName?.toLowerCase());
       if (genreId) {
         params = params.set('with_genres', genreId);
@@ -583,6 +628,119 @@ export class TmdbService {
   }
 
   /**
+   * Fetches full season details including individual episodes from TMDB.
+   * Cached in-memory to prevent duplicate requests.
+   * @param showId - The TMDB TV show ID.
+   * @param seasonNumber - The season number (e.g. 1, 2...).
+   */
+  getSeasonDetails(showId: number, seasonNumber: number): Observable<SeasonDetail | null> {
+    const key = `${showId}_s${seasonNumber}`;
+    if (this.seasonDetailsCache.has(key)) {
+      return of(this.seasonDetailsCache.get(key)!);
+    }
+
+    const params = this.createParams({ language: 'en-US' });
+
+    return this.http.get<any>(`${this.baseUrl}/tv/${showId}/season/${seasonNumber}`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(res => {
+        if (!res) return null;
+        const episodes: EpisodeDetail[] = (res.episodes || []).map((ep: any) => ({
+          id: ep.id,
+          episode_number: ep.episode_number,
+          season_number: ep.season_number,
+          name: ep.name || `Episode ${ep.episode_number}`,
+          overview: ep.overview || '',
+          air_date: ep.air_date || null,
+          runtime: ep.runtime || null,
+          still_path: ep.still_path ? `${this.imageBaseUrl}/w300${ep.still_path}` : null,
+          vote_average: ep.vote_average != null ? Math.round(ep.vote_average * 10) / 10 : null,
+          vote_count: ep.vote_count || 0,
+          episode_type: ep.episode_type || 'standard'
+        }));
+
+        const detail: SeasonDetail = {
+          id: res.id,
+          season_number: res.season_number,
+          name: res.name || `Season ${res.season_number}`,
+          overview: res.overview || '',
+          poster_path: res.poster_path ? `${this.imageBaseUrl}/w500${res.poster_path}` : null,
+          air_date: res.air_date || null,
+          episodes
+        };
+
+        this.seasonDetailsCache.set(key, detail);
+        return detail;
+      }),
+      catchError(err => {
+        console.error(`Error fetching season ${seasonNumber} for show ${showId}:`, err);
+        return of(null);
+      })
+    );
+  }
+
+  /**
+   * Fetches top popular TV shows scheduled to air between the given date range.
+   * Filtered and sorted strictly by popularity descending.
+   */
+  getTopUpcomingPopularShows(startDate: string, endDate: string): Observable<TVShow[]> {
+    const params = this.createParams({
+      language: 'en-US',
+      sort_by: 'popularity.desc',
+      'air_date.gte': startDate,
+      'air_date.lte': endDate
+    });
+
+    return this.http.get<any>(`${this.baseUrl}/discover/tv`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(res => (res?.results || []).filter((s: any) => s.poster_path).map((s: any) => this.mapShow(s))),
+      catchError(() => of([]))
+    );
+  }
+
+  /**
+   * Fetches TV shows airing today globally.
+   * @param page - Page number (default: 1).
+   */
+  getAiringTodayShows(page = 1): Observable<{ shows: TVShow[]; totalPages: number }> {
+    const params = this.createParams({ language: 'en-US', page });
+
+    return this.http.get<any>(`${this.baseUrl}/tv/airing_today`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(res => ({
+        shows: (res?.results || []).filter((s: any) => s.poster_path).map((s: any) => this.mapShow(s)),
+        totalPages: Math.min(res?.total_pages || 1, 20)
+      })),
+      catchError(() => of({ shows: [], totalPages: 1 }))
+    );
+  }
+
+  /**
+   * Fetches TV shows currently on the air (airing within the next 7 days).
+   * @param page - Page number (default: 1).
+   */
+  getOnTheAirShows(page = 1): Observable<{ shows: TVShow[]; totalPages: number }> {
+    const params = this.createParams({ language: 'en-US', page });
+
+    return this.http.get<any>(`${this.baseUrl}/tv/on_the_air`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(res => ({
+        shows: (res?.results || []).filter((s: any) => s.poster_path).map((s: any) => this.mapShow(s)),
+        totalPages: Math.min(res?.total_pages || 1, 20)
+      })),
+      catchError(() => of({ shows: [], totalPages: 1 }))
+    );
+  }
+
+  /**
    * Maps a raw TMDB API response object to the internal TVShow model.
    * @param item - Raw show object from TMDB.
    * @returns A normalized TVShow object.
@@ -625,5 +783,112 @@ export class TmdbService {
       summary: item.overview || '',
       genres
     };
+  }
+
+  /**
+   * Fetches full biographical profile, social media IDs, and TV filmography for a person.
+   * @param personId - TMDB person ID.
+   */
+  getPersonDetails(personId: number): Observable<PersonDetail> {
+    if (this.personDetailsCache.has(personId)) {
+      return of(this.personDetailsCache.get(personId)!);
+    }
+
+    const params = this.createParams({
+      append_to_response: 'tv_credits,external_ids',
+      language: 'es-ES'
+    });
+
+    return this.http.get<any>(`${this.baseUrl}/person/${personId}`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(data => {
+        const mapCredit = (item: any): PersonTvCreditShow => ({
+          id: item.id,
+          name: item.name || item.original_name || 'Untitled',
+          character: item.character || undefined,
+          job: item.job || undefined,
+          department: item.department || undefined,
+          episode_count: item.episode_count || undefined,
+          first_air_date: item.first_air_date || '',
+          poster_path: item.poster_path ? `${this.imageBaseUrl}/w342${item.poster_path}` : null,
+          backdrop_path: item.backdrop_path ? `${this.imageBaseUrl}/w780${item.backdrop_path}` : null,
+          vote_average: item.vote_average ? Math.round(item.vote_average * 10) / 10 : null,
+          vote_count: item.vote_count || 0,
+          popularity: item.popularity || 0,
+          overview: item.overview || '',
+          genre_ids: item.genre_ids || []
+        });
+
+        const rawCast = Array.isArray(data.tv_credits?.cast) ? data.tv_credits.cast : [];
+        const rawCrew = Array.isArray(data.tv_credits?.crew) ? data.tv_credits.crew : [];
+
+        // Deduplicate credits by ID (if an actor played in multiple seasons or roles, combine episode counts)
+        const castMap = new Map<number, PersonTvCreditShow>();
+        for (const c of rawCast) {
+          if (!castMap.has(c.id)) {
+            castMap.set(c.id, mapCredit(c));
+          } else {
+            const existing = castMap.get(c.id)!;
+            if (c.episode_count && existing.episode_count) {
+              existing.episode_count += c.episode_count;
+            }
+          }
+        }
+
+        const crewMap = new Map<number, PersonTvCreditShow>();
+        for (const c of rawCrew) {
+          if (!crewMap.has(c.id)) {
+            crewMap.set(c.id, mapCredit(c));
+          }
+        }
+
+        const cast = Array.from(castMap.values()).sort((a, b) => b.popularity - a.popularity);
+        const crew = Array.from(crewMap.values()).sort((a, b) => b.popularity - a.popularity);
+
+        const person: PersonDetail = {
+          id: data.id,
+          name: data.name,
+          biography: data.biography || '',
+          birthday: data.birthday || null,
+          deathday: data.deathday || null,
+          place_of_birth: data.place_of_birth || null,
+          profile_path: data.profile_path ? `${this.imageBaseUrl}/h632${data.profile_path}` : null,
+          known_for_department: data.known_for_department || 'Acting',
+          popularity: Math.round((data.popularity || 0) * 10) / 10,
+          homepage: data.homepage || null,
+          external_ids: {
+            imdb_id: data.external_ids?.imdb_id || null,
+            instagram_id: data.external_ids?.instagram_id || null,
+            twitter_id: data.external_ids?.twitter_id || null,
+            facebook_id: data.external_ids?.facebook_id || null,
+            tiktok_id: data.external_ids?.tiktok_id || null,
+            wikidata_id: data.external_ids?.wikidata_id || null
+          },
+          tv_credits: { cast, crew }
+        };
+
+        this.personDetailsCache.set(personId, person);
+        return person;
+      }),
+      catchError(err => {
+        console.error('Error fetching person details from TMDB:', err);
+        return of({
+          id: personId,
+          name: 'Unknown',
+          biography: '',
+          birthday: null,
+          deathday: null,
+          place_of_birth: null,
+          profile_path: null,
+          known_for_department: 'Acting',
+          popularity: 0,
+          homepage: null,
+          external_ids: {},
+          tv_credits: { cast: [], crew: [] }
+        } as PersonDetail);
+      })
+    );
   }
 }

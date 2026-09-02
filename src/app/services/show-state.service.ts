@@ -78,8 +78,20 @@ export class ShowStateService {
         }
         this.watchedShows.set(localWatched); // already sorted by loadFromStorage
       } else {
-        // Server always wins — this is what makes cross-device sync work.
-        this.watchedShows.set(this.sortByAddedAt(remoteWatched));
+        // Server data: ensure all items are timestamped and sorted
+        const baseNow = Date.now();
+        const repairedRemote = remoteWatched.map((w, index) => {
+          let ts = this.getShowTimestamp(w);
+          if (ts === 0) {
+            ts = baseNow - (index * 60000);
+          }
+          return {
+            ...w,
+            addedAt: ts
+          };
+        });
+        const sorted = this.sortByAddedAt(repairedRemote);
+        this.watchedShows.set(sorted);
       }
 
       // --- Pending shows ---
@@ -427,7 +439,7 @@ export class ShowStateService {
       userRating: 0,
       addedAt: now
     };
-    this.watchedShows.update(list => [newInstance, ...list]);
+    this.watchedShows.update(list => this.sortByAddedAt([newInstance, ...list.filter(w => w.instanceId !== newInstance.instanceId)]));
     this.removePending(show.id);
     this.save();
 
@@ -706,23 +718,47 @@ export class ShowStateService {
    * For entries without an explicit addedAt, extracts the timestamp embedded
    * in instanceId (format: showId_timestamp_random) as a fallback.
    */
-  private sortByAddedAt(list: WatchedShow[]): WatchedShow[] {
+  public sortByAddedAt(list: WatchedShow[]): WatchedShow[] {
     return [...list].sort((a, b) => {
-      const tsA = a.addedAt ?? this.extractTimestampFromInstanceId(a.instanceId);
-      const tsB = b.addedAt ?? this.extractTimestampFromInstanceId(b.instanceId);
+      const tsA = this.getShowTimestamp(a);
+      const tsB = this.getShowTimestamp(b);
       return tsB - tsA;
     });
   }
 
   /**
-   * Attempts to extract the embedded timestamp from an instanceId string.
-   * instanceId format: "showId_timestamp_random" — returns 0 if parsing fails.
+   * Resolves the creation/addition timestamp for a watched show instance.
    */
-  private extractTimestampFromInstanceId(instanceId: string): number {
+  public getShowTimestamp(item: WatchedShow): number {
+    if (!item) return 0;
+    // 1. Check embedded timestamp in instanceId (true addition time)
+    const fromId = this.extractTimestampFromInstanceId(item.instanceId || '');
+    if (fromId > 0) return fromId;
+
+    // 2. Check addedAt property (number or string)
+    if (item.addedAt) {
+      const parsed = typeof item.addedAt === 'number' ? item.addedAt : new Date(item.addedAt).getTime();
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Attempts to extract the embedded timestamp from an instanceId string.
+   * Scans all underscore-delimited parts for a valid epoch timestamp (ms or s).
+   */
+  public extractTimestampFromInstanceId(instanceId: string): number {
+    if (!instanceId) return 0;
     const parts = instanceId.split('_');
-    if (parts.length >= 2) {
-      const ts = parseInt(parts[1], 10);
-      if (!isNaN(ts) && ts > 1_000_000_000_000) return ts; // valid ms timestamp
+    for (const part of parts) {
+      const ts = parseInt(part, 10);
+      if (!isNaN(ts)) {
+        // Millisecond timestamp (e.g. 1700000000000 .. 2500000000000)
+        if (ts >= 1_000_000_000_000 && ts <= 2_500_000_000_000) return ts;
+        // Second timestamp (e.g. 1700000000 .. 2500000000)
+        if (ts >= 1_000_000_000 && ts <= 2_500_000_000) return ts * 1000;
+      }
     }
     return 0;
   }
@@ -734,26 +770,55 @@ export class ShowStateService {
 
   /**
    * Loads watched shows from localStorage.
-   * Ensures backward compatibility by generating instanceId for legacy entries.
+   * Ensures backward compatibility by generating instanceId and addedAt for legacy entries,
+   * sorts them by most recent first, and saves the corrected data back to storage.
    * @returns The array of watched shows, or empty array on parse error.
    */
   private loadFromStorage(): WatchedShow[] {
     try {
       const data = JSON.parse(localStorage.getItem('watchedShows') || '[]');
-      const list: WatchedShow[] = data.map((w: any) => {
+      if (!Array.isArray(data)) return [];
+
+      const baseNow = Date.now();
+      let modified = false;
+
+      const list: WatchedShow[] = data.map((w: any, index: number) => {
+        let ts = this.getShowTimestamp(w);
+        if (ts === 0) {
+          // If no timestamp is present at all, assign decreasing timestamps to maintain array order (index 0 is newest)
+          ts = baseNow - (index * 60000);
+          modified = true;
+        }
+
+        const instanceId = w.instanceId && this.extractTimestampFromInstanceId(w.instanceId) > 0
+          ? w.instanceId
+          : `${w.show?.id || index}_${ts}_${Math.random().toString(36).substr(2, 5)}`;
+
+        if (instanceId !== w.instanceId || w.addedAt !== ts) {
+          modified = true;
+        }
+
         const item: WatchedShow = {
           ...w,
-          instanceId: w.instanceId || w.show.id.toString() + '_' + Math.random().toString(36).substr(2, 5)
+          instanceId,
+          addedAt: ts
         };
+
         // Auto-repair if totalMinutes was 0 due to previous bug
         if (!item.totalMinutes || item.totalMinutes <= 0) {
           const t = this.calculateTime(item.show, item.seasonsWatched || 1);
           item.totalMinutes = t.minutes;
           item.episodesWatched = t.episodes;
+          modified = true;
         }
         return item;
       });
-      return this.sortByAddedAt(list);
+
+      const sorted = this.sortByAddedAt(list);
+      if (modified || JSON.stringify(data) !== JSON.stringify(sorted)) {
+        localStorage.setItem('watchedShows', JSON.stringify(sorted));
+      }
+      return sorted;
     } catch {
       return [];
     }

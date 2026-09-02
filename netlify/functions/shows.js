@@ -127,7 +127,7 @@ exports.handler = async (event, context) => {
       const { type, item } = body;
 
       if (type === 'watched') {
-        const now = new Date().toISOString();
+        const createdAt = item.addedAt ? new Date(item.addedAt).toISOString() : new Date().toISOString();
         await db`
           INSERT INTO watched_shows (user_id, instance_id, show_id, show_data, seasons_watched, total_minutes, episodes_watched, user_rating, created_at)
           VALUES (
@@ -139,7 +139,7 @@ exports.handler = async (event, context) => {
             ${item.totalMinutes},
             ${item.episodesWatched},
             ${item.userRating},
-            ${now}
+            ${createdAt}
           )
           ON CONFLICT (user_id, instance_id) DO UPDATE SET
             show_data        = EXCLUDED.show_data,
