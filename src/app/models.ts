@@ -48,8 +48,14 @@ export function formatGenresLabel(genres: string[]): string {
 export interface TVShow {
   /** Unique identifier from TMDB. */
   id: number;
-  /** Display name of the show. */
+  /** Display name of the show (English by default). */
   name: string;
+  /** Original name in language of origin. */
+  original_name?: string;
+  /** Localized/Spanish name if different from English. */
+  localized_name?: string;
+  /** Popularity metric from TMDB. */
+  popularity?: number;
   /** URL to the show's poster image, or null if unavailable. */
   poster_path: string | null;
   /** URL to the show's backdrop image, or null if unavailable. */

@@ -87,6 +87,7 @@ export class TmdbService {
   private personDetailsCache = new Map<number, PersonDetail>();
   private discoverCache = new Map<string, { page: number; totalPages: number; totalResults: number; shows: TVShow[] }>();
   private trendingCache: TVShow[] | null = null;
+  private recommendationsCache = new Map<number, TVShow[]>();
 
   readonly COUNTRIES = SUPPORTED_COUNTRIES;
   readonly selectedCountry = signal<string>(this.getInitialCountryCode());
@@ -180,12 +181,27 @@ export class TmdbService {
     return this.addAuthParams(params);
   }
 
+  /** Gets appropriate API language code based on selected region or browser language. */
+  getApiLanguage(): string {
+    const country = this.selectedCountry();
+    const spanish = ['ES', 'AR', 'BO', 'CL', 'CO', 'CR', 'EC', 'GT', 'HN', 'MX', 'PE', 'UY', 'VE', 'DO'];
+    if (spanish.includes(country)) return 'es-ES';
+    if (country === 'BR') return 'pt-BR';
+    if (country === 'DE' || country === 'AT') return 'de-DE';
+    if (country === 'FR') return 'fr-FR';
+    if (country === 'IT') return 'it-IT';
+    if (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('es')) return 'es-ES';
+    return 'en-US';
+  }
+
   getUserCountryCode(): string {
     return this.selectedCountry();
   }
 
   /**
    * Searches for TV shows on TMDB by query string.
+   * Titles are returned in English by default as primary name, while seamlessly supporting
+   * searches in Spanish (or other regional titles) via dual-locale parallel matching.
    * @param query - The search term entered by the user.
    * @returns An observable emitting an array of matching TVShow results.
    */
@@ -193,18 +209,100 @@ export class TmdbService {
     const trimmed = query.trim();
     if (!trimmed) return of([]);
 
-    const params = this.createParams({
+    const enParams = this.createParams({
       query: trimmed,
       language: 'en-US',
       include_adult: 'false',
       page: '1'
     });
 
-    return this.http.get<any>(`${this.baseUrl}/search/tv`, {
-      headers: this.getHeaders(),
-      params
-    }).pipe(
-      map(res => (res.results || []).map((item: any) => this.mapShow(item))),
+    const esParams = this.createParams({
+      query: trimmed,
+      language: 'es-ES',
+      include_adult: 'false',
+      page: '1'
+    });
+
+    const enReq = this.http.get<any>(`${this.baseUrl}/search/tv`, { headers: this.getHeaders(), params: enParams })
+      .pipe(catchError(() => of({ results: [] })));
+    const esReq = this.http.get<any>(`${this.baseUrl}/search/tv`, { headers: this.getHeaders(), params: esParams })
+      .pipe(catchError(() => of({ results: [] })));
+
+    return forkJoin([enReq, esReq]).pipe(
+      map(([enRes, esRes]) => {
+        const enResults = enRes?.results || [];
+        const esResults = esRes?.results || [];
+
+        // Build a map of Spanish names by ID
+        const esMap = new Map<number, any>();
+        for (const item of esResults) {
+          esMap.set(item.id, item);
+        }
+
+        const mergedMap = new Map<number, TVShow>();
+
+        // 1. Process English results as base (English title by default!)
+        for (const item of enResults) {
+          const show = this.mapShow(item);
+          const esItem = esMap.get(item.id);
+          if (esItem && esItem.name && esItem.name.toLowerCase() !== show.name.toLowerCase()) {
+            show.localized_name = esItem.name;
+          }
+          mergedMap.set(item.id, show);
+        }
+
+        // 2. Add any items found ONLY by Spanish search
+        for (const esItem of esResults) {
+          if (!mergedMap.has(esItem.id)) {
+            const show = this.mapShow(esItem);
+            // Default title must be English: prefer original_name if it was in English, or keep Spanish as localized
+            if (esItem.original_name && esItem.original_name.toLowerCase() !== show.name.toLowerCase()) {
+              show.localized_name = esItem.name;
+              show.name = esItem.original_name;
+            }
+            mergedMap.set(esItem.id, show);
+          }
+        }
+
+        const shows = Array.from(mergedMap.values());
+
+        // Helper to strip accents and lowercase for fuzzy matching
+        const clean = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const normQuery = clean(trimmed);
+
+        // Intelligent relevance ranking:
+        return shows.sort((a, b) => {
+          const aName = clean(a.name);
+          const bName = clean(b.name);
+          const aOrig = clean(a.original_name || '');
+          const bOrig = clean(b.original_name || '');
+          const aLoc = clean(a.localized_name || '');
+          const bLoc = clean(b.localized_name || '');
+
+          // 1. Exact match priority (checks English, Spanish, and Original)
+          const aExact = aName === normQuery || aOrig === normQuery || aLoc === normQuery;
+          const bExact = bName === normQuery || bOrig === normQuery || bLoc === normQuery;
+          if (aExact && !bExact) return -1;
+          if (!aExact && bExact) return 1;
+          if (aExact && bExact) return (b.popularity || 0) - (a.popularity || 0);
+
+          // 2. Starts-with priority
+          const aStarts = aName.startsWith(normQuery) || aOrig.startsWith(normQuery) || aLoc.startsWith(normQuery);
+          const bStarts = bName.startsWith(normQuery) || bOrig.startsWith(normQuery) || bLoc.startsWith(normQuery);
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+          if (aStarts && bStarts) return (b.popularity || 0) - (a.popularity || 0);
+
+          // 3. Shows with real posters prioritized over placeholders
+          const aHasPoster = a.poster_path && !a.poster_path.includes('placeholder');
+          const bHasPoster = b.poster_path && !b.poster_path.includes('placeholder');
+          if (aHasPoster && !bHasPoster) return -1;
+          if (!aHasPoster && bHasPoster) return 1;
+
+          // 4. Popularity metric from TMDB
+          return (b.popularity || 0) - (a.popularity || 0);
+        });
+      }),
       catchError(err => {
         console.error('TMDB search error:', err);
         return of([]);
@@ -419,6 +517,34 @@ export class TmdbService {
         console.error('TMDB top 250 error:', err);
         return of([]);
       })
+    );
+  }
+
+  /**
+   * Fetches TMDB recommendations for a specific TV show.
+   * @param showId - TMDB show ID.
+   * @returns Observable emitting an array of recommended TVShow objects.
+   */
+  getRecommendationsForShow(showId: number): Observable<TVShow[]> {
+    if (this.recommendationsCache.has(showId)) {
+      return of(this.recommendationsCache.get(showId)!);
+    }
+
+    const params = this.createParams({
+      language: 'en-US',
+      page: '1'
+    });
+
+    return this.http.get<any>(`${this.baseUrl}/tv/${showId}/recommendations`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(res => {
+        const shows = (res.results || []).map((item: any) => this.mapShow(item));
+        this.recommendationsCache.set(showId, shows);
+        return shows;
+      }),
+      catchError(() => of([]))
     );
   }
 
@@ -747,7 +873,7 @@ export class TmdbService {
    */
   private mapShow(item: any): TVShow {
     const poster = item.poster_path
-      ? `${this.imageBaseUrl}/w500${item.poster_path}`
+      ? `${this.imageBaseUrl}/w342${item.poster_path}`
       : 'https://via.placeholder.com/210x295/1e293b/6366f1?text=No+Image';
 
     let runtime = 45;
@@ -767,12 +893,13 @@ export class TmdbService {
     const voteAvg = item.vote_average != null ? Math.round(item.vote_average * 10) / 10 : null;
 
     const backdrop = item.backdrop_path
-      ? `${this.imageBaseUrl}/original${item.backdrop_path}`
+      ? `${this.imageBaseUrl}/w1280${item.backdrop_path}`
       : null;
 
     return {
       id: item.id,
       name: item.name || item.original_name || 'Untitled Show',
+      original_name: item.original_name || undefined,
       poster_path: poster,
       backdrop_path: backdrop,
       first_air_date: item.first_air_date || '',
@@ -781,7 +908,8 @@ export class TmdbService {
       rating: voteAvg,
       seasons: [],
       summary: item.overview || '',
-      genres
+      genres,
+      popularity: item.popularity || 0
     };
   }
 

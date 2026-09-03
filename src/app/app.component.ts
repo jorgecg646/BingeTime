@@ -50,8 +50,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Derives background slideshow images from the user's watchlist posters.
-   * Falls back to a default image when the watchlist is empty.
+   * Derives background slideshow images from the user's watchlist backdrops/posters.
+   * Prioritizes high-definition 16:9 backdrops so the background artwork fits full screens
+   * naturally without being awkwardly zoomed in or cropped. Falls back to posters or default art.
    */
   bgImages = computed(() => {
     const shows = this.state.watchedShows();
@@ -59,10 +60,15 @@ export class AppComponent implements OnInit, OnDestroy {
     if (shows.length === 0) {
       return [defaultImage];
     }
-    return shows
-      .map(w => w.show.poster_path)
-      .filter((path): path is string => !!path)
-      .map(path => path.replace('/w500/', '/original/'));
+    const images: string[] = [];
+    for (const w of shows) {
+      // Prioritize 16:9 widescreen backdrop, fallback to poster
+      const path = w.show.backdrop_path || w.show.poster_path;
+      if (path) {
+        images.push(path.replace('/w500/', '/original/').replace('/w780/', '/original/'));
+      }
+    }
+    return images.length > 0 ? images : [defaultImage];
   });
 
   /** URL of the first background image layer. */

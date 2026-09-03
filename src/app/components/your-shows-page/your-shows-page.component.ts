@@ -6,11 +6,12 @@ import { YourShowsComponent } from '../your-shows/your-shows.component';
 import { PendingShowsComponent } from '../pending-shows/pending-shows.component';
 import { SearchComponent } from '../search/search.component';
 import { PendingShow } from '../../models';
+import { RecommendedForYouComponent } from '../recommended-for-you/recommended-for-you.component';
 
 @Component({
   selector: 'app-your-shows-page',
   standalone: true,
-  imports: [RouterLink, CounterComponent, YourShowsComponent, PendingShowsComponent, SearchComponent],
+  imports: [RouterLink, CounterComponent, YourShowsComponent, PendingShowsComponent, SearchComponent, RecommendedForYouComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="animate-fade-in relative z-10">
@@ -143,6 +144,9 @@ import { PendingShow } from '../../models';
           (removeShow)="state.removeShow($event)"
           (setUserRating)="state.setUserRating($event.item, $event.rating)">
         </app-your-shows>
+
+        <!-- 🤖 Recommended For You (AI / Smart Recommender Algorithm) -->
+        <app-recommended-for-you></app-recommended-for-you>
       } @else {
         <div class="text-center py-16 glass rounded-2xl max-w-md mx-auto border border-white/5 p-8 mt-6">
           <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-5">

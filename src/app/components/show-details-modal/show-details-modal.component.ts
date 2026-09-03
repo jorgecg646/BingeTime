@@ -107,6 +107,14 @@ import { TmdbService } from '../../services/tmdb.service';
                       <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
                       <span class="text-amber-400 font-bold flex items-center gap-1">★ {{ show()!.rating }}</span>
                     }
+
+                    @if (totalShowWatchedMinutes() > 0) {
+                      <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+                      <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1 text-xs">
+                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>Watched Time: {{ formatInstanceTime(totalShowWatchedMinutes()) }}</span>
+                      </span>
+                    }
                   </div>
 
                   <!-- Network & Status Badges -->
@@ -135,6 +143,119 @@ import { TmdbService } from '../../services/tmdb.service';
                       @for (g of show()!.genres; track g) {
                         <span class="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-zinc-300">{{ g }}</span>
                       }
+                    </div>
+                  }
+
+                  <!-- 🏆 Watched Status & Copies Card (Prominently at the top) -->
+                  @if (instances().length > 0) {
+                    <div class="mb-5 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-zinc-900/80 to-zinc-950 border border-emerald-500/30 shadow-xl relative overflow-hidden backdrop-blur-md animate-fade-in">
+                      <!-- Ambient green glow in background -->
+                      <div class="absolute -top-10 -right-10 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                      <div class="flex items-center justify-between mb-3 relative z-10">
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                          </div>
+                          <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                              <h4 class="text-xs sm:text-sm font-black text-emerald-400 tracking-wider uppercase">
+                                Watched {{ instances().length }} time{{ instances().length !== 1 ? 's' : '' }}
+                              </h4>
+                              <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-extrabold text-xs flex items-center gap-1">
+                                <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>Watched Time: {{ formatInstanceTime(totalShowWatchedMinutes()) }}</span>
+                              </span>
+                            </div>
+                            <p class="text-[11px] text-zinc-400 font-medium">Your personal viewing history for this show</p>
+                          </div>
+                        </div>
+                        
+                        <button 
+                          (click)="addAgain.emit(show()!)"
+                          class="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition-all flex items-center gap-1.5 active:scale-95 shadow-sm">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                          <span>Add Rewatch</span>
+                        </button>
+                      </div>
+
+                      <!-- List of viewing copies -->
+                      <div class="space-y-2.5 relative z-10">
+                        @for (item of instances(); track item.instanceId; let idx = $index) {
+                          <div class="p-3 rounded-xl bg-black/50 hover:bg-black/70 border border-white/10 hover:border-emerald-500/40 transition-all flex flex-wrap items-center justify-between gap-3 shadow-inner">
+                            
+                            <!-- Left: Copy #, Seasons, Episode count & Time -->
+                            <div class="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                              <span class="px-2.5 py-1 rounded-lg bg-white/10 border border-white/15 text-white font-black text-xs">
+                                Copy #{{ idx + 1 }}
+                              </span>
+                              
+                              <div class="flex items-center gap-2">
+                                <span class="text-xs text-zinc-400">Seasons:</span>
+                                <span class="text-xs font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  {{ item.seasonsWatched }}/{{ item.show.number_of_seasons }}
+                                </span>
+                              </div>
+
+                              <!-- Prominent Watched Time Badge for this copy -->
+                              <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-xs">
+                                <span class="text-zinc-400 font-semibold">Watched Time:</span>
+                                <strong class="text-emerald-300 font-black">{{ formatInstanceTime(item.totalMinutes) }}</strong>
+                                <span class="text-zinc-500 text-[10px]">({{ item.episodesWatched }} eps)</span>
+                              </div>
+                            </div>
+
+                            <!-- Right: Controls (Season adjust + Rating + Delete) -->
+                            <div class="flex items-center gap-2.5">
+                              
+                              <!-- Season decrement/increment buttons -->
+                              <div class="flex items-center bg-white/5 border border-white/10 rounded-lg p-0.5">
+                                <button 
+                                  (click)="state.changeSeason(item, -1)" 
+                                  [disabled]="item.seasonsWatched <= 1"
+                                  class="p-1 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 rounded transition-all" 
+                                  title="Remove season">
+                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
+                                </button>
+                                <button 
+                                  (click)="state.changeSeason(item, 1)" 
+                                  [disabled]="item.seasonsWatched >= state.getMaxAiredSeasons(item.show)"
+                                  class="p-1 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 rounded transition-all" 
+                                  title="Add season">
+                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                                </button>
+                              </div>
+
+                              <!-- Rating dropdown -->
+                              <div class="flex items-center gap-1.5 bg-black/60 border border-white/15 px-2.5 py-1 rounded-xl">
+                                <span class="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                                  <span>★</span>
+                                  <span>Rating:</span>
+                                </span>
+                                <select 
+                                  [ngModel]="item.userRating" 
+                                  (ngModelChange)="state.setUserRating(item, +$event)" 
+                                  class="bg-transparent text-xs font-black text-white focus:outline-none cursor-pointer">
+                                  <option [ngValue]="0" class="bg-zinc-900 text-zinc-400">--</option>
+                                  @for (r of [1,2,3,4,5,6,7,8,9,10]; track r) {
+                                    <option [ngValue]="r" class="bg-zinc-900 text-amber-400 font-bold">{{ r }}</option>
+                                  }
+                                </select>
+                              </div>
+
+                              <!-- Delete Copy button -->
+                              <button 
+                                (click)="state.removeShow(item.instanceId)" 
+                                class="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all active:scale-95" 
+                                title="Delete this viewing entry">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                              </button>
+
+                            </div>
+
+                          </div>
+                        }
+                      </div>
                     </div>
                   }
                   
@@ -329,47 +450,6 @@ import { TmdbService } from '../../services/tmdb.service';
                     </div>
                   }
                 </div>
-
-                <!-- 📋 Watched Instances Section -->
-                @if (instances().length > 0) {
-                  <div class="mt-4 pt-4 border-t border-white/10">
-                    <h4 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                      Watched {{ instances().length }} time{{ instances().length !== 1 ? 's' : '' }}
-                    </h4>
-                    
-                    <div class="space-y-2 max-h-36 overflow-y-auto pr-1 custom-scrollbar">
-                      @for (item of instances(); track item.instanceId; let idx = $index) {
-                        <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-xs">
-                          <div class="flex items-center gap-3">
-                            <span class="font-bold text-zinc-300">Copy #{{ idx + 1 }}</span>
-                            <span class="text-zinc-400">Seasons: <strong class="text-white">{{ item.seasonsWatched }}/{{ item.show.number_of_seasons }}</strong></span>
-                            <div class="flex items-center gap-1">
-                              <span class="text-zinc-500">Rating:</span>
-                              <select [ngModel]="item.userRating" (ngModelChange)="state.setUserRating(item, +$event)" 
-                                      class="bg-black/50 border border-white/15 rounded px-1 py-0.5 text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer">
-                                <option [ngValue]="0">--</option>
-                                <option [ngValue]="1">1</option>
-                                <option [ngValue]="2">2</option>
-                                <option [ngValue]="3">3</option>
-                                <option [ngValue]="4">4</option>
-                                <option [ngValue]="5">5</option>
-                                <option [ngValue]="6">6</option>
-                                <option [ngValue]="7">7</option>
-                                <option [ngValue]="8">8</option>
-                                <option [ngValue]="9">9</option>
-                                <option [ngValue]="10">10</option>
-                              </select>
-                            </div>
-                          </div>
-                          <button (click)="state.removeShow(item.instanceId)" class="p-1 text-zinc-500 hover:text-red-400 transition-colors" title="Delete copy">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                          </button>
-                        </div>
-                      }
-                    </div>
-                  </div>
-                }
 
                 <!-- 💡 More Like This (Recommendations Carousel) -->
                 @if (show()!.recommendations && show()!.recommendations!.length > 0) {
@@ -585,6 +665,11 @@ export class ShowDetailsModalComponent {
     return this.state.watchedShows().filter(w => w.show.id === s.id);
   });
 
+  /** Total cumulative minutes watched across all viewing instances of this show. */
+  totalShowWatchedMinutes = computed(() => {
+    return this.instances().reduce((acc, i) => acc + (i.totalMinutes || 0), 0);
+  });
+
   /** Whether the "link copied" feedback is currently visible. */
   copied = signal(false);
 
@@ -608,5 +693,15 @@ export class ShowDetailsModalComponent {
    */
   openPerson(personId: number): void {
     this.tmdb.openPersonModal(personId);
+  }
+
+  /** Formats total minutes into a concise human-readable time string. */
+  formatInstanceTime(totalMinutes: number): string {
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const mins = totalMinutes % 60;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
   }
 }
