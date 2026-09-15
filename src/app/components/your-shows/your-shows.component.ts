@@ -19,17 +19,18 @@ import { ShowStateService } from '../../services/show-state.service';
     @if (watchedShows().length > 0) {
       <div class="space-y-4">
         
-        <!-- Controls Bar: Title + Counter + Sort + Genre Filter -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-white/5 pb-3">
-          <div class="flex items-center gap-3">
-            <h2 class="text-2xl font-bold tracking-tight text-white">Your Shows</h2>
-            <span class="text-xs px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400 font-semibold">
-              {{ sortedWatchedShows().length }}
-              @if (sortedWatchedShows().length !== watchedShows().length) {
-                <span> of {{ watchedShows().length }}</span>
-              }
-            </span>
-          </div>
+        <!-- Controls Bar: Title + Counter + Search + Sort + Genre Filter -->
+        <div class="flex flex-col gap-3 mb-4 border-b border-white/5 pb-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <h2 class="text-2xl font-bold tracking-tight text-white">Your Shows</h2>
+              <span class="text-xs px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400 font-semibold">
+                {{ sortedWatchedShows().length }}
+                @if (sortedWatchedShows().length !== watchedShows().length) {
+                  <span> of {{ watchedShows().length }}</span>
+                }
+              </span>
+            </div>
 
           <!-- Sort and Genre Filter Controls -->
           <div class="flex flex-wrap items-center gap-2 relative">
@@ -105,15 +106,39 @@ import { ShowStateService } from '../../services/show-state.service';
               </button>
             }
           </div>
+          </div>
+
+          <!-- Search bar -->
+          <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path></svg>
+            <input
+              type="text"
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
+              placeholder="Search your shows..."
+              class="w-full pl-9 pr-9 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 focus:border-white/30 text-sm text-white placeholder:text-zinc-500 focus:outline-none transition-all"
+            />
+            @if (searchQuery()) {
+              <button (click)="searchQuery.set('')" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            }
+          </div>
         </div>
 
         <!-- Empty state when genre filter leaves 0 results -->
         @if (sortedWatchedShows().length === 0) {
           <div class="py-12 px-4 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 text-center animate-fade-in">
-            <p class="text-sm font-semibold text-zinc-300">No series match your selected genre filter</p>
-            <button (click)="clearGenres()" class="mt-3 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all">
-              Show all {{ watchedShows().length }} series
-            </button>
+            @if (searchQuery()) {
+              <svg class="w-8 h-8 text-zinc-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path></svg>
+              <p class="text-sm font-semibold text-zinc-300">No shows found for "{{ searchQuery() }}"</p>
+              <button (click)="searchQuery.set('')" class="mt-3 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all">Clear search</button>
+            } @else {
+              <p class="text-sm font-semibold text-zinc-300">No series match your selected genre filter</p>
+              <button (click)="clearGenres()" class="mt-3 px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all">
+                Show all {{ watchedShows().length }} series
+              </button>
+            }
           </div>
         } @else {
           <div class="relative transition-all duration-500 ease-in-out"
@@ -148,42 +173,41 @@ import { ShowStateService } from '../../services/show-state.service';
                   </div>
                   
                   <!-- Glassmorphic Hover Overlay -->
-                  <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/85 backdrop-blur-md flex flex-col justify-between p-2 sm:p-5 select-none cursor-pointer z-10"
+                  <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/85 backdrop-blur-md flex flex-col p-2 sm:p-5 select-none cursor-pointer z-10"
                        (click)="openDetails.emit(item.show)">
                     
-                    <!-- Top: Seasons and Time -->
-                    <div class="space-y-1 sm:space-y-2">
-                      <div class="flex items-center justify-between">
-                        <span class="text-[9px] sm:text-xs text-zinc-400 font-bold uppercase tracking-wider">Seasons</span>
-                        <div class="flex items-center gap-1 sm:gap-2">
-                          <button (click)="changeSeason.emit({ item, delta: -1 }); $event.stopPropagation()" 
-                                  [disabled]="item.seasonsWatched <= 1"
-                                  class="w-5 h-5 sm:w-7 sm:h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-bold active:scale-95" 
-                                  title="Remove season">
-                            -
-                          </button>
-                          <span class="text-white font-black text-xs sm:text-base px-1">{{ item.seasonsWatched }}</span>
-                          <button (click)="changeSeason.emit({ item, delta: 1 }); $event.stopPropagation()" 
-                                  [disabled]="item.seasonsWatched >= state.getMaxAiredSeasons(item.show)"
-                                  class="w-5 h-5 sm:w-7 sm:h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-bold active:scale-95" 
-                                  title="Add season">
-                            +
-                          </button>
-                        </div>
-                      </div>
-                      <div class="text-[8px] sm:text-[10px] text-zinc-500 font-semibold uppercase tracking-wider text-right">
-                        max: {{ state.getMaxAiredSeasons(item.show) }}
+                    <!-- Top spacer so X button has room -->
+                    <div class="flex-1"></div>
+
+                    <!-- Center: Watch Time + Seasons directly below -->
+                    <div class="text-center">
+                      <div class="text-xs sm:text-sm text-zinc-400 font-medium">Watched Time</div>
+                      <span class="font-black text-white text-base sm:text-xl md:text-2xl">{{ formatTime(item.totalMinutes) }}</span>
+                      <!-- Seasons controls directly below watched time -->
+                      <div class="flex items-center justify-center gap-1.5 sm:gap-2.5 mt-2 sm:mt-3">
+                        <span class="text-[10px] sm:text-xs text-zinc-400 font-bold uppercase tracking-wider">Seasons</span>
+                        <button (click)="changeSeason.emit({ item, delta: -1 }); $event.stopPropagation()" 
+                                [disabled]="item.seasonsWatched <= 1"
+                                class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm sm:text-base font-black active:scale-95 border border-white/10" 
+                                title="Remove season">
+                          −
+                        </button>
+                        <span class="text-white font-black text-sm sm:text-lg px-1">{{ item.seasonsWatched }}</span>
+                        <button (click)="changeSeason.emit({ item, delta: 1 }); $event.stopPropagation()" 
+                                [disabled]="item.seasonsWatched >= state.getMaxAiredSeasons(item.show)"
+                                class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm sm:text-base font-black active:scale-95 border border-white/10" 
+                                title="Add season">
+                          +
+                        </button>
+                        <span class="text-[9px] sm:text-xs text-zinc-500 font-semibold">/ {{ state.getMaxAiredSeasons(item.show) }}</span>
                       </div>
                     </div>
 
-                    <!-- Center: Watch Time -->
-                    <div class="text-center py-0.5 sm:py-2">
-                      <div class="text-[9px] sm:text-xs text-zinc-400 font-medium">Watched Time</div>
-                      <span class="font-black text-white text-xs sm:text-base md:text-lg">{{ formatTime(item.totalMinutes) }}</span>
-                    </div>
+                    <!-- Bottom spacer -->
+                    <div class="flex-1"></div>
                     
-                    <!-- Bottom: User Rating Select & Episode Count -->
-                    <div class="space-y-1 sm:space-y-2 pt-1.5 sm:pt-2 border-t border-white/5">
+                    <!-- Bottom: Rating + Episode Count -->
+                    <div class="space-y-1 pt-1.5 sm:pt-2 border-t border-white/5">
                       <div class="flex items-center justify-between gap-1">
                         <span class="text-[9px] sm:text-xs text-zinc-300 font-medium">Rating:</span>
                         <select [ngModel]="item.userRating" (ngModelChange)="setUserRating.emit({ item, rating: +$event }); $event.stopPropagation()" 
@@ -244,6 +268,7 @@ export class YourShowsComponent {
   ratingOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   readonly genres = ALL_GENRES;
+  searchQuery = signal<string>('');
   selectedGenres = signal<string[]>([]);
   selectedSort = signal<string>('recently_added');
   activeDropdown = signal<'sort' | 'genre' | null>(null);
@@ -294,7 +319,13 @@ export class YourShowsComponent {
 
     let list = [...raw];
 
-    // 1. Filter by selected genres
+    // 1. Filter by search query
+    const query = this.searchQuery().trim().toLowerCase();
+    if (query) {
+      list = list.filter(w => w.show.name.toLowerCase().includes(query));
+    }
+
+    // 2. Filter by selected genres
     const selGenres = this.selectedGenres();
     if (selGenres.length > 0) {
       list = list.filter(w => {
@@ -303,7 +334,7 @@ export class YourShowsComponent {
       });
     }
 
-    // 2. Sort
+    // 3. Sort
     const sort = this.selectedSort();
     if (sort === 'rating_desc') return list.sort((a, b) => ((b.userRating || 0) - (a.userRating || 0)) || ((b.show.rating || 0) - (a.show.rating || 0)));
     if (sort === 'hours_desc') return list.sort((a, b) => (b.totalMinutes || 0) - (a.totalMinutes || 0));

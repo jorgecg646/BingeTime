@@ -190,11 +190,26 @@ import { TmdbService } from '../../services/tmdb.service';
                                 Copy #{{ idx + 1 }}
                               </span>
                               
-                              <div class="flex items-center gap-2">
+                              <div class="flex items-center gap-1.5">
                                 <span class="text-xs text-zinc-400">Seasons:</span>
+                                <!-- Season decrement/increment buttons inline with value -->
+                                <button 
+                                  (click)="state.changeSeason(item, -1)" 
+                                  [disabled]="item.seasonsWatched <= 1"
+                                  class="p-1 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 rounded transition-all" 
+                                  title="Remove season">
+                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
+                                </button>
                                 <span class="text-xs font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                                   {{ item.seasonsWatched }}/{{ item.show.number_of_seasons }}
                                 </span>
+                                <button 
+                                  (click)="state.changeSeason(item, 1)" 
+                                  [disabled]="item.seasonsWatched >= state.getMaxAiredSeasons(item.show)"
+                                  class="p-1 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 rounded transition-all" 
+                                  title="Add season">
+                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                                </button>
                               </div>
 
                               <!-- Prominent Watched Time Badge for this copy -->
@@ -208,24 +223,6 @@ import { TmdbService } from '../../services/tmdb.service';
                             <!-- Right: Controls (Season adjust + Rating + Delete) -->
                             <div class="flex items-center gap-2.5">
                               
-                              <!-- Season decrement/increment buttons -->
-                              <div class="flex items-center bg-white/5 border border-white/10 rounded-lg p-0.5">
-                                <button 
-                                  (click)="state.changeSeason(item, -1)" 
-                                  [disabled]="item.seasonsWatched <= 1"
-                                  class="p-1 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 rounded transition-all" 
-                                  title="Remove season">
-                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path></svg>
-                                </button>
-                                <button 
-                                  (click)="state.changeSeason(item, 1)" 
-                                  [disabled]="item.seasonsWatched >= state.getMaxAiredSeasons(item.show)"
-                                  class="p-1 text-zinc-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/10 rounded transition-all" 
-                                  title="Add season">
-                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                                </button>
-                              </div>
-
                               <!-- Rating dropdown -->
                               <div class="flex items-center gap-1.5 bg-black/60 border border-white/15 px-2.5 py-1 rounded-xl">
                                 <span class="text-[11px] font-bold text-amber-400 flex items-center gap-1">
