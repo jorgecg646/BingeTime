@@ -106,6 +106,7 @@ export class TmdbService {
     this.isRegionModalOpen.set(true);
   }
 
+
   closeRegionModal(): void {
     this.isRegionModalOpen.set(false);
   }
@@ -149,7 +150,7 @@ export class TmdbService {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('bingetime_user_region', upper);
       }
-    } catch {}
+    } catch { }
     this.discoverCache.clear();
   }
 
@@ -436,8 +437,8 @@ export class TmdbService {
               created_at: rev.created_at ? rev.created_at.slice(0, 10) : '',
               rating: rev.author_details?.rating || null,
               avatar_path: rev.author_details?.avatar_path ? (
-                rev.author_details.avatar_path.startsWith('/http') 
-                  ? rev.author_details.avatar_path.slice(1) 
+                rev.author_details.avatar_path.startsWith('/http')
+                  ? rev.author_details.avatar_path.slice(1)
                   : `${this.imageBaseUrl}/w185${rev.author_details.avatar_path}`
               ) : null
             }));
