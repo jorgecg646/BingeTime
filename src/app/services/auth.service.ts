@@ -44,6 +44,13 @@ export class AuthService {
     return u?.token?.access_token || null;
   }
 
+  /** Normalizes token expiration timestamp to milliseconds regardless of whether GoTrue provided ms or seconds */
+  private getExpiresAtMs(token: any): number {
+    const raw = token?.expires_at ?? 0;
+    if (!raw) return 0;
+    return raw > 1e11 ? raw : raw * 1000;
+  }
+
   /**
    * Returns a valid JWT token, refreshing it first if it has expired or is close to expiring.
    * Use this before making authenticated API calls to avoid 401 errors.
@@ -53,7 +60,7 @@ export class AuthService {
     if (!u) return null;
 
     try {
-      const expiresAt = (u.token?.expires_at ?? 0) * 1000;
+      const expiresAt = this.getExpiresAtMs(u.token);
       // If token expires in less than 2 minutes or is already expired, refresh it proactively
       const needsRefresh = Date.now() >= (expiresAt - 2 * 60 * 1000);
 
@@ -98,7 +105,7 @@ export class AuthService {
     // Restore persisted session from localStorage on startup.
     const currentUser = this.auth.currentUser();
     if (currentUser) {
-      const expiresAt = (currentUser.token?.expires_at ?? 0) * 1000;
+      const expiresAt = this.getExpiresAtMs(currentUser.token);
       const tokenIsValid = Date.now() < expiresAt;
 
       if (tokenIsValid) {
@@ -117,11 +124,21 @@ export class AuthService {
           })
           .catch((err: any) => {
             console.warn('Could not refresh expired token on startup:', err);
-            // If the refresh token itself is invalid/revoked, clear user; otherwise keep local state
+            // Only clear the session if the refresh token is PERMANENTLY invalid.
+            // A generic network error (e.g. proxy not running, ECONNREFUSED, timeout)
+            // must NOT log the user out — we keep local state and let the next
+            // API call trigger a fresh refresh attempt.
             const msg = (err?.message || '').toLowerCase();
-            if (msg.includes('invalid') || msg.includes('revoked')) {
+            const isPermanentlyInvalid =
+              msg.includes('invalid refresh token') ||
+              msg.includes('token has been revoked') ||
+              msg.includes('no user found') ||
+              (msg.includes('revoked') && !msg.includes('network')) ||
+              (msg.includes('invalid') && msg.includes('grant'));
+            if (isPermanentlyInvalid) {
               this.user.set(null);
             } else {
+              // Temporary failure (network, proxy, etc.) — keep the user logged in.
               this.user.set(currentUser);
             }
           })
@@ -142,7 +159,7 @@ export class AuthService {
       this.refreshTimer = null;
     }
 
-    const expiresAt = (user.token?.expires_at ?? 0) * 1000;
+    const expiresAt = this.getExpiresAtMs(user.token);
     const now = Date.now();
     // Refresh 5 minutes before expiry, with a minimum delay of 30 seconds
     const delay = Math.max(expiresAt - now - (5 * 60 * 1000), 30 * 1000);

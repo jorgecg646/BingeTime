@@ -27,6 +27,11 @@ export class ShowStateService {
    * localStorage data is shown immediately; this flag can drive a subtle UI indicator.
    */
   isSyncingFromNeon = signal<boolean>(false);
+  /**
+   * Non-null when the last attempt to sync with the server failed.
+   * Use this to show a subtle warning in the UI.
+   */
+  syncError = signal<string | null>(null);
 
   /** The show currently displayed in the details modal, or null if closed. */
   activeShowForDetails = signal<TVShow | null>(null);
@@ -62,57 +67,89 @@ export class ShowStateService {
 
   private async loadUserDataFromNeon(userId: string) {
     this.isSyncingFromNeon.set(true);
+    this.syncError.set(null);
+
+    // Snapshot local state BEFORE any async operation.
+    // If the server call fails, this is the ground truth we keep.
+    const localWatched = this.loadFromStorage();
+    const localPending = this.loadPendingFromStorage();
+
     try {
       const { watched: remoteWatched, pending: remotePending } =
         await this.supabaseService.getAllShows(userId);
 
-      const localWatched = this.loadFromStorage();
-      const localPending = this.loadPendingFromStorage();
-
       // --- Watched shows ---
-      // Only migrate local→server when the server has ZERO records (true first login).
-      // In all other cases the server is the source of truth.
       if (remoteWatched.length === 0 && localWatched.length > 0) {
+        // True first login: migrate all local data to the server.
         for (const item of localWatched) {
           await this.supabaseService.upsertWatchedShow(userId, item);
         }
-        this.watchedShows.set(localWatched); // already sorted by loadFromStorage
+        this.watchedShows.set(localWatched);
       } else {
-        // Server data: ensure all items are timestamped and sorted
+        // Server has data: repair timestamps.
         const baseNow = Date.now();
         const repairedRemote = remoteWatched.map((w, index) => {
           let ts = this.getShowTimestamp(w);
           if (ts === 0) {
             ts = baseNow - (index * 60000);
           }
-          return {
-            ...w,
-            addedAt: ts
-          };
+          return { ...w, addedAt: ts };
         });
-        const sorted = this.sortByAddedAt(repairedRemote);
-        this.watchedShows.set(sorted);
+
+        // Smart merge: detect local items that the server doesn't have.
+        // This happens when a previous upsert failed (network error, token
+        // expired, etc.). We keep those local items and retry the upsert so
+        // the server eventually catches up — instead of silently discarding them.
+        const serverIds = new Set(repairedRemote.map(w => w.instanceId));
+        const unsyncedLocal = localWatched.filter(w => !serverIds.has(w.instanceId));
+
+        if (unsyncedLocal.length > 0) {
+          for (const item of unsyncedLocal) {
+            this.supabaseService.upsertWatchedShow(userId, item).catch(err =>
+              console.error('Error re-syncing unsynced local watched show:', err)
+            );
+          }
+          this.watchedShows.set(this.sortByAddedAt([...repairedRemote, ...unsyncedLocal]));
+        } else {
+          this.watchedShows.set(this.sortByAddedAt(repairedRemote));
+        }
       }
 
       // --- Pending shows ---
       if (remotePending.length === 0 && localPending.length > 0) {
+        // True first login: migrate all local pending to the server.
         for (const item of localPending) {
           await this.supabaseService.upsertPendingShow(userId, item);
         }
         this.pendingShows.set(localPending);
       } else {
-        // Server always wins.
-        this.pendingShows.set(remotePending);
+        // Smart merge for pending: keep unsynced local items.
+        const serverPendingIds = new Set(remotePending.map(p => p.id));
+        const unsyncedPending = localPending.filter(p => !serverPendingIds.has(p.id));
+
+        if (unsyncedPending.length > 0) {
+          for (const item of unsyncedPending) {
+            this.supabaseService.upsertPendingShow(userId, item).catch(err =>
+              console.error('Error re-syncing unsynced local pending show:', err)
+            );
+          }
+          this.pendingShows.set([...remotePending, ...unsyncedPending]);
+        } else {
+          this.pendingShows.set(remotePending);
+        }
       }
 
-      // Persist the fresh server data to localStorage so the next page visit
-      // can show it instantly as a cache while the background sync runs.
+      // Persist the merged result to localStorage as a fresh cache.
       localStorage.setItem('watchedShows', JSON.stringify(this.watchedShows()));
       localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
       this.autoMigrateLegacyShows();
     } catch (err) {
       console.error('Error loading user data from Neon:', err);
-      // Falls back to localStorage data already shown on screen — no disruption.
+      // Server unreachable (e.g. dev without netlify dev, or network error).
+      // Restore local state explicitly so signals always reflect what the user sees.
+      this.watchedShows.set(localWatched);
+      this.pendingShows.set(localPending);
+      this.syncError.set('Could not sync with server. Your local data is shown.');
     } finally {
       this.isSyncingFromNeon.set(false);
     }

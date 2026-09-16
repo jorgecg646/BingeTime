@@ -1,2 +1,10 @@
+[build]
+  publish = "dist/tv-time-calculator/browser"
+
 [functions]
   node_bundler = "esbuild"
+
+[dev]
+  framework = "#static"
+  targetPort = 4200
+  port = 8888
