@@ -698,6 +698,44 @@ export class TmdbService {
   }
 
   /**
+   * Fetches the trending TV shows of the week from TMDB with pagination support.
+   * @param page - Results page number (default: 1).
+   * @returns An observable emitting paginated TVShow results.
+   */
+  getTrendingShowsPaged(page = 1): Observable<{ page: number; totalPages: number; totalResults: number; shows: TVShow[] }> {
+    const cacheKey = `trending_week_${page}`;
+    if (this.discoverCache.has(cacheKey)) {
+      return of(this.discoverCache.get(cacheKey)!);
+    }
+
+    let params = new HttpParams()
+      .set('language', 'en-US')
+      .set('page', page.toString());
+    params = this.addAuthParams(params);
+
+    return this.http.get<any>(`${this.baseUrl}/trending/tv/week`, {
+      headers: this.getHeaders(),
+      params
+    }).pipe(
+      map(res => {
+        if (!res || !res.results) return { page: 1, totalPages: 1, totalResults: 0, shows: [] };
+        const result = {
+          page: res.page || 1,
+          totalPages: Math.min(res.total_pages || 1, 500),
+          totalResults: res.total_results || 0,
+          shows: res.results.filter((i: any) => i.poster_path).map((i: any) => this.mapShow(i))
+        };
+        this.discoverCache.set(cacheKey, result);
+        return result;
+      }),
+      catchError(err => {
+        console.error('TMDB trending error:', err);
+        return of({ page: 1, totalPages: 1, totalResults: 0, shows: [] });
+      })
+    );
+  }
+
+  /**
    * Fetches recently aired or upcoming episodes for a given show.
    * Checks both last_episode_to_air and next_episode_to_air from TMDB.
    * @param showId - The TMDB show ID.

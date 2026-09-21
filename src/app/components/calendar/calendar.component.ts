@@ -37,83 +37,85 @@ export interface CalendarDayCell {
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="animate-fade-in relative z-10 pb-20 w-full max-w-[1600px] mx-auto">
+    <div class="animate-fade-in relative z-10 pb-20 w-full max-w-[1600px] mx-auto px-1 sm:px-0">
       
       <!-- Top Header & Navigation Bar -->
       <div class="mb-6 border-b border-white/10 pb-6">
         <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
           
           <!-- Title & Back link -->
-          <div class="flex items-center gap-3.5">
-            <a routerLink="/" class="p-2.5 sm:p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/10 shadow-md shrink-0">
+          <div class="flex items-center gap-3">
+            <a routerLink="/" class="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-white/10 shadow-md shrink-0">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
             </a>
             <div>
-              <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
+              <h2 class="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2">
                 <span>📅 TV Schedule Calendar</span>
               </h2>
               <p class="text-zinc-400 text-xs sm:text-sm mt-0.5">Air dates and scheduled broadcasts for your series and top TV releases</p>
             </div>
           </div>
 
-          <!-- Top Controls Bar -->
-          <div class="flex flex-wrap items-center gap-3">
+          <!-- Top Controls Bar (Responsive wrap on mobile) -->
+          <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 sm:gap-3 w-full xl:w-auto">
             
-            <!-- Source Toggle Mode (My Shows vs Top Popular) -->
-            <div class="flex items-center bg-zinc-900/90 p-1 rounded-2xl border border-white/15 shadow-xl">
-              <button 
-                (click)="calendarMode.set('my-shows')"
-                [class]="calendarMode() === 'my-shows' ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30' : 'text-zinc-400 hover:text-white'"
-                class="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                <span>My Shows</span>
-              </button>
-              
-              <button 
-                (click)="calendarMode.set('popular')"
-                [class]="calendarMode() === 'popular' ? 'bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/30' : 'text-zinc-400 hover:text-white'"
-                class="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path></svg>
-                <span>Top Popular</span>
-              </button>
-            </div>
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+              <!-- Source Toggle Mode (My Shows vs Top Popular) -->
+              <div class="flex items-center bg-zinc-900/90 p-1 rounded-2xl border border-white/15 shadow-xl flex-1 sm:flex-initial justify-center">
+                <button 
+                  (click)="calendarMode.set('my-shows')"
+                  [class]="calendarMode() === 'my-shows' ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30' : 'text-zinc-400 hover:text-white'"
+                  class="flex-1 sm:flex-initial px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5">
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                  <span>My Shows</span>
+                </button>
+                
+                <button 
+                  (click)="calendarMode.set('popular')"
+                  [class]="calendarMode() === 'popular' ? 'bg-amber-500 text-black font-extrabold shadow-md shadow-amber-500/30' : 'text-zinc-400 hover:text-white'"
+                  class="flex-1 sm:flex-initial px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5">
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path></svg>
+                  <span>Top Popular</span>
+                </button>
+              </div>
 
-            <!-- View Style Switcher (Month / Week / Agenda List) -->
-            <div class="flex items-center bg-zinc-900/90 p-1 rounded-2xl border border-white/15 shadow-xl">
-              <button 
-                (click)="viewType.set('month')"
-                [class]="viewType() === 'month' ? 'bg-white/20 text-white font-bold' : 'text-zinc-400 hover:text-white'"
-                class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all"
-                title="Month Grid View">
-                Month
-              </button>
-              <button 
-                (click)="viewType.set('week')"
-                [class]="viewType() === 'week' ? 'bg-white/20 text-white font-bold' : 'text-zinc-400 hover:text-white'"
-                class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all"
-                title="7-Day Week View">
-                Week
-              </button>
-              <button 
-                (click)="viewType.set('agenda')"
-                [class]="viewType() === 'agenda' ? 'bg-white/20 text-white font-bold' : 'text-zinc-400 hover:text-white'"
-                class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all"
-                title="Agenda List View">
-                Agenda
-              </button>
+              <!-- View Style Switcher (Month / Week / Agenda List) -->
+              <div class="flex items-center bg-zinc-900/90 p-1 rounded-2xl border border-white/15 shadow-xl flex-1 sm:flex-initial justify-center">
+                <button 
+                  (click)="viewType.set('month')"
+                  [class]="viewType() === 'month' ? 'bg-white/20 text-white font-bold' : 'text-zinc-400 hover:text-white'"
+                  class="flex-1 sm:flex-initial px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all text-center"
+                  title="Month Grid View">
+                  Month
+                </button>
+                <button 
+                  (click)="viewType.set('week')"
+                  [class]="viewType() === 'week' ? 'bg-white/20 text-white font-bold' : 'text-zinc-400 hover:text-white'"
+                  class="flex-1 sm:flex-initial px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all text-center"
+                  title="7-Day Week View">
+                  Week
+                </button>
+                <button 
+                  (click)="viewType.set('agenda')"
+                  [class]="viewType() === 'agenda' ? 'bg-white/20 text-white font-bold' : 'text-zinc-400 hover:text-white'"
+                  class="flex-1 sm:flex-initial px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all text-center"
+                  title="Agenda List View">
+                  Agenda
+                </button>
+              </div>
             </div>
 
             <!-- Month / Period Switcher -->
-            <div class="flex items-center bg-zinc-900/90 rounded-2xl border border-white/15 p-1 shadow-xl">
+            <div class="flex items-center justify-between sm:justify-start bg-zinc-900/90 rounded-2xl border border-white/15 p-1 shadow-xl w-full sm:w-auto">
               <button 
                 (click)="prevPeriod()" 
-                class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+                class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-95 shrink-0"
                 title="Previous">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
               </button>
               <button 
                 (click)="goToToday()"
-                class="px-3 py-1.5 rounded-xl hover:bg-white/10 text-xs sm:text-sm font-extrabold text-white tracking-wide min-w-[120px] sm:min-w-[150px] text-center transition-colors">
+                class="flex-1 px-3 py-1.5 rounded-xl hover:bg-white/10 text-xs sm:text-sm font-extrabold text-white tracking-wide min-w-[110px] sm:min-w-[150px] text-center transition-colors">
                 @if (viewType() === 'week') {
                   Week of {{ currentWeekLabel() }}
                 } @else {
@@ -122,7 +124,7 @@ export interface CalendarDayCell {
               </button>
               <button 
                 (click)="nextPeriod()" 
-                class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+                class="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all active:scale-95 shrink-0"
                 title="Next">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
               </button>
@@ -135,118 +137,138 @@ export interface CalendarDayCell {
 
       <!-- Loading State -->
       @if (loading()) {
-        <div class="flex flex-col items-center justify-center py-32">
-          <svg class="animate-spin h-12 w-12 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24">
+        <div class="flex flex-col items-center justify-center py-24 sm:py-32">
+          <svg class="animate-spin h-10 w-10 sm:h-12 sm:w-12 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p class="text-zinc-300 text-sm font-bold">Loading broadcasts for {{ currentMonthName() }} {{ currentYear() }}...</p>
+          <p class="text-zinc-300 text-xs sm:text-sm font-bold">Loading broadcasts for {{ currentMonthName() }} {{ currentYear() }}...</p>
         </div>
       } @else {
 
-        <!-- 1. MONTH VIEW (Responsive Table with overflow prevention) -->
+        <!-- 1. MONTH VIEW (Responsive Table: Fluid 7 columns on all devices, no horizontal scroll) -->
         @if (viewType() === 'month') {
-          <div class="glass-strong rounded-3xl border border-white/15 overflow-hidden shadow-2xl">
+          <div class="glass-strong rounded-2xl sm:rounded-3xl border border-white/15 overflow-hidden shadow-2xl">
             
-            <!-- Horizontal scroll container on mobile/tablet so columns never compress -->
-            <div class="overflow-x-auto custom-scrollbar">
-              <div class="min-w-[1050px] xl:min-w-full">
-                
-                <!-- Weekday Headers -->
-                <div class="grid grid-cols-7 border-b border-white/10 bg-zinc-950/95 text-center text-xs sm:text-sm font-black text-zinc-400 py-3.5 uppercase tracking-wider">
-                  <span>Mon</span>
-                  <span>Tue</span>
-                  <span>Wed</span>
-                  <span>Thu</span>
-                  <span>Fri</span>
-                  <span class="text-amber-400/90">Sat</span>
-                  <span class="text-amber-400/90">Sun</span>
-                </div>
+            <div class="w-full">
+              <!-- Weekday Headers -->
+              <div class="grid grid-cols-7 border-b border-white/10 bg-zinc-950/95 text-center text-[10px] sm:text-xs md:text-sm font-black text-zinc-400 py-2 sm:py-3.5 uppercase tracking-wider">
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span class="text-amber-400/90">Sat</span>
+                <span class="text-amber-400/90">Sun</span>
+              </div>
 
-                <!-- Month Grid Cells -->
-                <div class="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-white/10 bg-black/40">
-                  @for (day of calendarDays(); track day.dateKey) {
-                    <div 
-                      (click)="selectDay(day, true)"
-                      [class]="'min-h-[120px] sm:min-h-[140px] md:min-h-[150px] p-1.5 sm:p-2 transition-all flex flex-col cursor-pointer group relative ' + 
-                               (!day.isCurrentMonth ? 'opacity-25 bg-black/60' : 'hover:bg-white/[0.05]') + ' ' + 
-                               (day.isSelected ? 'ring-2 ring-blue-500 ring-inset bg-blue-500/[0.12]' : '') + ' ' +
-                               (day.isToday ? 'bg-amber-400/[0.06]' : '')">
-                      
-                      <!-- Header: Day Number + Count badge -->
-                      <div class="flex items-center justify-between mb-1.5">
-                        <span 
-                          [class]="day.isToday 
-                            ? 'w-6 h-6 rounded-full bg-amber-400 text-black font-black flex items-center justify-center text-[11px] shadow-md shadow-amber-400/30' 
-                            : (day.isSelected ? 'w-6 h-6 rounded-full bg-blue-600 text-white font-black flex items-center justify-center text-[11px] shadow' : 'text-xs font-bold text-zinc-400 group-hover:text-white')">
-                          {{ day.dayNumber }}
+              <!-- Month Grid Cells (Adaptive heights: compact on mobile with indicator dots, full cards on desktop) -->
+              <div class="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-white/10 bg-black/40">
+                @for (day of calendarDays(); track day.dateKey) {
+                  <div 
+                    (click)="selectDay(day, true)"
+                    [class]="'min-h-[58px] sm:min-h-[85px] md:min-h-[145px] p-1 sm:p-1.5 md:p-2 transition-all flex flex-col cursor-pointer group relative ' + 
+                             (!day.isCurrentMonth ? 'opacity-25 bg-black/60' : 'hover:bg-white/[0.05]') + ' ' + 
+                             (day.isSelected ? 'ring-2 ring-blue-500 ring-inset bg-blue-500/[0.12]' : '') + ' ' +
+                             (day.isToday ? 'bg-amber-400/[0.06]' : '')">
+                    
+                    <!-- Header: Day Number + Count badge -->
+                    <div class="flex items-center justify-between gap-1 mb-1">
+                      <span 
+                        [class]="day.isToday 
+                          ? 'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-400 text-black font-black flex items-center justify-center text-[10px] sm:text-[11px] shadow-md shadow-amber-400/30' 
+                          : (day.isSelected ? 'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-600 text-white font-black flex items-center justify-center text-[10px] sm:text-[11px] shadow' : 'text-[10px] sm:text-xs font-bold text-zinc-400 group-hover:text-white')">
+                        {{ day.dayNumber }}
+                      </span>
+
+                      @if (day.events.length > 0) {
+                        <span class="px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded text-[8px] sm:text-[10px] font-extrabold shrink-0"
+                              [class]="calendarMode() === 'popular' ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'">
+                          {{ day.events.length }}
                         </span>
-
-                        @if (day.events.length > 0) {
-                          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                                [class]="calendarMode() === 'popular' ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'">
-                            {{ day.events.length }}
-                          </span>
-                        }
-                      </div>
-
-                      <!-- Show cards inside cell - BIG posters with name and episode tag -->
-                      <div class="flex-1 space-y-1.5 overflow-hidden flex flex-col justify-start">
-                        @for (ev of day.events.slice(0, 3); track ev.show.id + '-' + ev.seasonNumber + '-' + ev.episodeNumber) {
-                          <div 
-                            (click)="state.openDetails(ev.show); $event.stopPropagation()"
-                            class="p-1.5 rounded-xl bg-zinc-900/95 hover:bg-zinc-800/95 border border-white/10 hover:border-amber-400/40 text-xs text-white transition-all flex items-center gap-2 shadow-sm group/chip"
-                            title="{{ ev.show.name }} - S{{ ev.seasonNumber }}E{{ ev.episodeNumber }}: {{ ev.episodeName }}">
-                            
-                            <!-- Big Poster -->
-                            @if (ev.show.poster_path) {
-                              <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-8 h-12 rounded-lg object-cover shrink-0 shadow group-hover/chip:scale-105 transition-transform" />
-                            } @else {
-                              <div class="w-8 h-12 rounded-lg bg-zinc-800 flex items-center justify-center text-[9px] text-zinc-500 shrink-0">TV</div>
-                            }
-                            
-                            <div class="flex-1 min-w-0">
-                              <p class="truncate font-extrabold text-[11px] sm:text-xs leading-snug text-white group-hover/chip:text-amber-400 transition-colors">
-                                {{ ev.show.name }}
-                              </p>
-                              <div class="flex items-center gap-1 mt-0.5">
-                                <span class="text-[9px] sm:text-[10px] font-mono text-blue-400 font-bold">
-                                  S{{ ev.seasonNumber }}E{{ ev.episodeNumber }}
-                                </span>
-                                @if (ev.voteAverage) {
-                                  <span class="text-[9px] sm:text-[10px] text-amber-400 font-bold">★ {{ ev.voteAverage }}</span>
-                                }
-                              </div>
-                            </div>
-
-                          </div>
-                        }
-
-                        @if (day.events.length > 3) {
-                          <button 
-                            (click)="selectDay(day, true); $event.stopPropagation()"
-                            class="w-full text-[10px] font-black text-blue-300 hover:text-white bg-blue-600/25 hover:bg-blue-600/60 active:scale-95 px-2 py-1 rounded-lg text-center border border-blue-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                            title="View all {{ day.events.length }} episodes">
-                            <span>+{{ day.events.length - 3 }} more</span>
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
-                          </button>
-                        }
-                      </div>
-
+                      }
                     </div>
-                  }
-                </div>
 
+                    <!-- MOBILE-ONLY COMPACT EVENT INDICATOR (hidden on md+, visible on mobile/tablet) -->
+                    @if (day.events.length > 0) {
+                      <div class="flex md:hidden items-center justify-center gap-1 mt-auto pb-1">
+                        <span class="w-1.5 h-1.5 rounded-full"
+                              [class]="calendarMode() === 'popular' ? 'bg-amber-400 ring-1 ring-amber-400/50' : 'bg-blue-400 ring-1 ring-blue-400/50'"></span>
+                        @if (day.events.length > 1) {
+                          <span class="w-1.5 h-1.5 rounded-full"
+                                [class]="calendarMode() === 'popular' ? 'bg-amber-400/80' : 'bg-blue-400/80'"></span>
+                        }
+                        @if (day.events.length > 2) {
+                          <span class="w-1.5 h-1.5 rounded-full"
+                                [class]="calendarMode() === 'popular' ? 'bg-amber-400/50' : 'bg-blue-400/50'"></span>
+                        }
+                      </div>
+                    }
+
+                    <!-- DESKTOP SHOW CARDS inside cell (hidden on mobile, visible on md+) -->
+                    <div class="hidden md:flex flex-1 space-y-1.5 overflow-hidden flex-col justify-start">
+                      @for (ev of day.events.slice(0, 3); track ev.show.id + '-' + ev.seasonNumber + '-' + ev.episodeNumber) {
+                        <div 
+                          (click)="state.openDetails(ev.show); $event.stopPropagation()"
+                          class="p-1.5 rounded-xl bg-zinc-900/95 hover:bg-zinc-800/95 border border-white/10 hover:border-amber-400/40 text-xs text-white transition-all flex items-center gap-2 shadow-sm group/chip"
+                          title="{{ ev.show.name }} - S{{ ev.seasonNumber }}E{{ ev.episodeNumber }}: {{ ev.episodeName }}">
+                          
+                          <!-- Big Poster -->
+                          @if (ev.show.poster_path) {
+                            <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-7 h-10 lg:w-8 lg:h-12 rounded-lg object-cover shrink-0 shadow group-hover/chip:scale-105 transition-transform" />
+                          } @else {
+                            <div class="w-7 h-10 lg:w-8 lg:h-12 rounded-lg bg-zinc-800 flex items-center justify-center text-[9px] text-zinc-500 shrink-0">TV</div>
+                          }
+                          
+                          <div class="flex-1 min-w-0">
+                            <p class="truncate font-extrabold text-[11px] lg:text-xs leading-snug text-white group-hover/chip:text-amber-400 transition-colors">
+                              {{ ev.show.name }}
+                            </p>
+                            <div class="flex items-center gap-1 mt-0.5">
+                              <span class="text-[9px] lg:text-[10px] font-mono text-blue-400 font-bold">
+                                S{{ ev.seasonNumber }}E{{ ev.episodeNumber }}
+                              </span>
+                              @if (ev.voteAverage) {
+                                <span class="text-[9px] lg:text-[10px] text-amber-400 font-bold">★ {{ ev.voteAverage }}</span>
+                              }
+                            </div>
+                          </div>
+
+                        </div>
+                      }
+
+                      @if (day.events.length > 3) {
+                        <button 
+                          (click)="selectDay(day, true); $event.stopPropagation()"
+                          class="w-full text-[10px] font-black text-blue-300 hover:text-white bg-blue-600/25 hover:bg-blue-600/60 active:scale-95 px-2 py-1 rounded-lg text-center border border-blue-500/30 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          title="View all {{ day.events.length }} episodes">
+                          <span>+{{ day.events.length - 3 }} more</span>
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                      }
+                    </div>
+
+                  </div>
+                }
               </div>
             </div>
 
+          </div>
+
+          <!-- Mobile tip -->
+          <div class="mt-2.5 flex items-center justify-between text-xs text-zinc-400 px-1 md:hidden">
+            <span class="flex items-center gap-1.5 text-[11px]">
+              <span class="w-2 h-2 rounded-full" [class]="calendarMode() === 'popular' ? 'bg-amber-400' : 'bg-blue-400'"></span>
+              Días con emisiones
+            </span>
+            <span class="text-zinc-500 text-[11px]">Toca un día para ver episodios</span>
           </div>
         }
 
         <!-- 2. WEEK VIEW (Spacious 7 Columns with Full Cards) -->
         @if (viewType() === 'week') {
-          <div class="glass-strong rounded-3xl border border-white/15 p-4 sm:p-6 shadow-2xl">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+          <div class="glass-strong rounded-2xl sm:rounded-3xl border border-white/15 p-3 sm:p-6 shadow-2xl">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
               @for (day of currentWeekDays(); track day.dateKey) {
                 <div 
                   (click)="selectDay(day, true)"
@@ -255,10 +277,10 @@ export interface CalendarDayCell {
                            (day.isSelected ? 'ring-2 ring-blue-500' : '')">
                   
                   <!-- Day Header -->
-                  <div class="border-b border-white/10 pb-2 mb-3 flex items-center justify-between">
+                  <div class="border-b border-white/10 pb-2 mb-2 sm:mb-3 flex items-center justify-between">
                     <div>
-                      <p class="text-[11px] font-black uppercase text-zinc-400">{{ formatWeekday(day.date) }}</p>
-                      <h4 class="text-lg font-black text-white">{{ day.date.getDate() }} {{ formatMonthShort(day.date) }}</h4>
+                      <p class="text-[10px] sm:text-[11px] font-black uppercase text-zinc-400">{{ formatWeekday(day.date) }}</p>
+                      <h4 class="text-base sm:text-lg font-black text-white">{{ day.date.getDate() }} {{ formatMonthShort(day.date) }}</h4>
                     </div>
                     @if (day.isToday) {
                       <span class="px-2 py-0.5 rounded-full bg-amber-400 text-black text-[10px] font-black uppercase">Today</span>
@@ -266,16 +288,18 @@ export interface CalendarDayCell {
                   </div>
 
                   <!-- Events for this day -->
-                  <div class="space-y-2 flex-1 min-h-[140px]">
+                  <div class="space-y-2 flex-1 min-h-0 sm:min-h-[140px]">
                     @if (day.events.length === 0) {
-                      <p class="text-zinc-600 text-xs italic py-4 text-center">No releases</p>
+                      <p class="text-zinc-600 text-xs italic py-2 sm:py-4 text-center">No releases</p>
                     } @else {
                       @for (ev of day.events; track ev.show.id + '-' + ev.seasonNumber + '-' + ev.episodeNumber) {
                         <div 
                           (click)="state.openDetails(ev.show); $event.stopPropagation()"
-                          class="p-2.5 rounded-2xl bg-zinc-900/90 border border-white/10 hover:border-amber-400/40 transition-all flex gap-2.5 items-center group shadow-md cursor-pointer">
+                          class="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-zinc-900/90 border border-white/10 hover:border-amber-400/40 transition-all flex gap-2.5 items-center group shadow-md cursor-pointer">
                           @if (ev.show.poster_path) {
-                            <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-10 h-14 rounded-xl object-cover shrink-0 shadow group-hover:scale-105 transition-transform" />
+                            <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-9 h-12 sm:w-10 sm:h-14 rounded-lg sm:rounded-xl object-cover shrink-0 shadow group-hover:scale-105 transition-transform" />
+                          } @else {
+                            <div class="w-9 h-12 sm:w-10 sm:h-14 rounded-lg sm:rounded-xl bg-zinc-800 flex items-center justify-center text-[9px] text-zinc-500 shrink-0">TV</div>
                           }
                           <div class="flex-1 min-w-0">
                             <p class="text-white text-xs sm:text-sm font-extrabold truncate group-hover:text-amber-400 transition-colors">{{ ev.show.name }}</p>
@@ -299,18 +323,28 @@ export interface CalendarDayCell {
 
         <!-- 3. AGENDA / LIST VIEW (Clean Mobile & Desktop Timeline) -->
         @if (viewType() === 'agenda') {
-          <div class="space-y-4">
+          <div class="space-y-3 sm:space-y-4">
             @if (agendaGroups().length === 0) {
               <div class="text-center py-16 glass rounded-2xl border border-white/10 p-8">
-                <p class="text-zinc-400 text-sm font-semibold">No episodes scheduled for this month.</p>
+                <div class="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-3xl mx-auto mb-4">
+                  📅
+                </div>
+                <h4 class="text-white text-base font-bold mb-1.5">No episodes scheduled for {{ currentMonthName() }} {{ currentYear() }}</h4>
+                <p class="text-zinc-400 text-xs sm:text-sm font-medium max-w-md mx-auto">
+                  @if (calendarMode() === 'my-shows') {
+                    None of the series in your watchlist have scheduled broadcasts for this month. Try switching to <button (click)="calendarMode.set('popular')" class="text-amber-400 hover:text-amber-300 font-bold underline transition-colors cursor-pointer">Top Popular</button> to see general TV releases.
+                  } @else {
+                    No top TV releases found for this month.
+                  }
+                </p>
               </div>
             } @else {
               @for (group of agendaGroups(); track group.dateKey) {
-                <div class="glass-strong rounded-2xl border border-white/10 p-4 sm:p-5 shadow-xl">
+                <div class="glass-strong rounded-2xl border border-white/10 p-3.5 sm:p-5 shadow-xl">
                   
                   <!-- Group Date Header -->
-                  <div class="flex items-center gap-3 mb-3 border-b border-white/10 pb-2">
-                    <div class="px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5"
+                  <div class="flex items-center justify-between sm:justify-start gap-3 mb-3 border-b border-white/10 pb-2">
+                    <div class="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5"
                          [class]="group.isToday ? 'bg-amber-400 text-black border border-amber-300' : 'bg-white/10 text-zinc-300 border border-white/10'">
                       <span>{{ group.formattedDate }}</span>
                     </div>
@@ -318,18 +352,20 @@ export interface CalendarDayCell {
                   </div>
 
                   <!-- Cards Grid -->
-                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
                     @for (ev of group.events; track ev.show.id + '-' + ev.seasonNumber + '-' + ev.episodeNumber) {
-                      <div class="p-3 bg-zinc-950/80 rounded-xl border border-white/10 hover:border-white/20 flex gap-3 items-center group cursor-pointer"
+                      <div class="p-2.5 sm:p-3 bg-zinc-950/80 rounded-xl border border-white/10 hover:border-white/20 flex gap-2.5 sm:gap-3 items-center group cursor-pointer"
                            (click)="state.openDetails(ev.show)">
                         @if (ev.show.poster_path) {
-                          <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-12 h-16 rounded-lg object-cover shrink-0" />
+                          <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-10 h-14 sm:w-12 sm:h-16 rounded-lg object-cover shrink-0" />
+                        } @else {
+                          <div class="w-10 h-14 sm:w-12 sm:h-16 rounded-lg bg-zinc-800 flex items-center justify-center text-[9px] text-zinc-500 shrink-0">TV</div>
                         }
                         <div class="flex-1 min-w-0">
-                          <h5 class="text-white text-sm font-bold truncate group-hover:text-amber-400">{{ ev.show.name }}</h5>
-                          <span class="text-xs text-blue-400 font-mono font-bold">S{{ ev.seasonNumber }}E{{ ev.episodeNumber }} - {{ ev.episodeName }}</span>
+                          <h5 class="text-white text-xs sm:text-sm font-bold truncate group-hover:text-amber-400">{{ ev.show.name }}</h5>
+                          <span class="text-[11px] sm:text-xs text-blue-400 font-mono font-bold">S{{ ev.seasonNumber }}E{{ ev.episodeNumber }} - {{ ev.episodeName }}</span>
                           @if (ev.voteAverage) {
-                            <p class="text-amber-400 text-[11px] font-bold mt-0.5">★ {{ ev.voteAverage }}</p>
+                            <p class="text-amber-400 text-[10px] sm:text-[11px] font-bold mt-0.5">★ {{ ev.voteAverage }}</p>
                           }
                         </div>
                       </div>
@@ -344,16 +380,16 @@ export interface CalendarDayCell {
 
         <!-- Selected Day Inspector Panel (Spacious view for active date) -->
         @if (selectedDay(); as day) {
-          <div id="day-inspector" class="mt-8 p-6 sm:p-8 glass-strong rounded-3xl border border-white/15 shadow-2xl animate-fade-in scroll-mt-24">
+          <div id="day-inspector" class="mt-6 sm:mt-8 p-4 sm:p-6 md:p-8 glass-strong rounded-2xl sm:rounded-3xl border border-white/15 shadow-2xl animate-fade-in scroll-mt-24">
             
             <!-- Day Inspector Header with Quick Day Navigator -->
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-white/10 pb-5">
-              <div class="flex items-center gap-3.5">
-                <div class="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-xl font-bold shrink-0">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 sm:mb-6 border-b border-white/10 pb-4 sm:pb-5">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg sm:text-xl font-bold shrink-0">
                   📅
                 </div>
                 <div>
-                  <h3 class="text-2xl font-black text-white">
+                  <h3 class="text-xl sm:text-2xl font-black text-white">
                     {{ formatFullDate(day.date) }}
                   </h3>
                   <p class="text-zinc-400 text-xs sm:text-sm mt-0.5 font-medium">
@@ -365,17 +401,19 @@ export interface CalendarDayCell {
               </div>
 
               <!-- Day switcher arrows + Today Badge -->
-              <div class="flex items-center gap-2 self-start sm:self-auto">
-                <button (click)="shiftSelectedDay(-1)" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-bold flex items-center gap-1">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
-                  <span>Prev Day</span>
-                </button>
-                <button (click)="shiftSelectedDay(1)" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-bold flex items-center gap-1">
-                  <span>Next Day</span>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
-                </button>
+              <div class="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                <div class="flex items-center gap-2">
+                  <button (click)="shiftSelectedDay(-1)" class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-bold flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+                    <span>Prev Day</span>
+                  </button>
+                  <button (click)="shiftSelectedDay(1)" class="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white transition-all text-xs font-bold flex items-center gap-1">
+                    <span>Next Day</span>
+                    <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+                  </button>
+                </div>
                 @if (day.isToday) {
-                  <span class="px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black text-xs uppercase tracking-wider shadow">
+                  <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-amber-400 text-black font-black text-xs uppercase tracking-wider shadow shrink-0">
                     🔥 Today
                   </span>
                 }
@@ -390,15 +428,17 @@ export interface CalendarDayCell {
                 </p>
               </div>
             } @else {
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
                 @for (ev of day.events; track ev.show.id + '-' + ev.seasonNumber + '-' + ev.episodeNumber) {
-                  <div class="p-4 sm:p-5 rounded-2xl bg-zinc-950/80 border border-white/10 hover:border-white/20 transition-all flex gap-4 items-start group shadow-xl">
+                  <div class="p-3.5 sm:p-5 rounded-2xl bg-zinc-950/80 border border-white/10 hover:border-white/20 transition-all flex gap-3 sm:gap-4 items-start group shadow-xl">
                     
                     <!-- Large Poster Thumbnail -->
-                    <div class="relative w-20 h-28 sm:w-24 sm:h-36 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer"
+                    <div class="relative w-16 h-24 sm:w-20 sm:h-28 md:w-24 md:h-36 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-lg cursor-pointer"
                          (click)="state.openDetails(ev.show)">
                       @if (ev.show.poster_path) {
                         <img [src]="ev.show.poster_path" [alt]="ev.show.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      } @else {
+                        <div class="w-full h-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-500">TV</div>
                       }
                       
                       @if (ev.isWatched) {
@@ -409,19 +449,19 @@ export interface CalendarDayCell {
                     </div>
 
                     <!-- Details Column -->
-                    <div class="flex-1 min-w-0 flex flex-col justify-between h-full">
+                    <div class="flex-1 min-w-0 flex flex-col justify-between self-stretch">
                       <div>
-                        <h4 class="text-white text-base font-extrabold truncate group-hover:text-amber-400 cursor-pointer transition-colors"
+                        <h4 class="text-white text-sm sm:text-base font-extrabold truncate group-hover:text-amber-400 cursor-pointer transition-colors"
                             (click)="state.openDetails(ev.show)">
                           {{ ev.show.name }}
                         </h4>
 
-                        <div class="mt-1 flex items-center gap-2">
-                          <span class="px-2 py-0.5 rounded-md bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-mono font-bold">
+                        <div class="mt-1 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <span class="px-2 py-0.5 rounded-md bg-blue-600/30 border border-blue-500/40 text-blue-300 text-[11px] sm:text-xs font-mono font-bold">
                             S{{ ev.seasonNumber }}E{{ ev.episodeNumber }}
                           </span>
                           @if (ev.voteAverage) {
-                            <span class="text-amber-400 text-xs font-bold flex items-center gap-0.5">
+                            <span class="text-amber-400 text-[11px] sm:text-xs font-bold flex items-center gap-0.5">
                               ★ {{ ev.voteAverage }}
                             </span>
                           }
@@ -439,17 +479,17 @@ export interface CalendarDayCell {
                       </div>
 
                       <!-- Action Buttons -->
-                      <div class="mt-3 pt-2 border-t border-white/5 flex items-center gap-2">
+                      <div class="mt-3 pt-2 border-t border-white/5 flex flex-wrap items-center gap-2">
                         <button 
                           (click)="state.openDetails(ev.show)"
-                          class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all">
+                          class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all">
                           Details
                         </button>
                         
                         @if (!ev.isWatched && !ev.isPending) {
                           <button 
                             (click)="state.addToPending(ev.show)"
-                            class="px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shadow">
+                            class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all shadow">
                             + Pending
                           </button>
                         }
@@ -551,6 +591,13 @@ export class CalendarComponent implements OnInit {
       );
     });
 
+    const curr = this.currentDate();
+    const y = curr.getFullYear();
+    const m = curr.getMonth();
+    // Allow episodes around the visible range (from 2 months before to 6 months ahead)
+    const rangeStart = new Date(y, m - 2, 1).toISOString().slice(0, 10);
+    const rangeEnd = new Date(y, m + 7, 0).toISOString().slice(0, 10);
+
     const latestSeasonRequests: Observable<CalendarEpisodeEvent[]>[] = showIds.map(id => {
       const show = showMap.get(id)!;
       const numSeasons = show.number_of_seasons || 1;
@@ -558,7 +605,7 @@ export class CalendarComponent implements OnInit {
         map(season => {
           if (!season || !season.episodes) return [];
           return season.episodes
-            .filter(ep => ep.air_date != null && ep.air_date !== '')
+            .filter(ep => ep.air_date != null && ep.air_date >= rangeStart && ep.air_date <= rangeEnd)
             .map(ep => ({
               show,
               seasonNumber: ep.season_number,
@@ -795,7 +842,13 @@ export class CalendarComponent implements OnInit {
   });
 
   agendaGroups = computed(() => {
-    const events = this.allEvents();
+    const curr = this.currentDate();
+    const year = curr.getFullYear();
+    const month = curr.getMonth();
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    // Filter events strictly for the currently viewed month
+    const events = this.allEvents().filter(e => e.airDate && e.airDate.startsWith(monthPrefix));
     const groups = new Map<string, CalendarEpisodeEvent[]>();
 
     events.forEach(e => {

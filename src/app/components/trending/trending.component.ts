@@ -86,7 +86,13 @@ import { ShowStateService } from '../../services/show-state.service';
             <h2 class="text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
               <span>Discover TV Shows</span>
             </h2>
-            <p class="text-zinc-400 text-xs mt-1">Explore all shows, filter by streaming platform, genres and rankings</p>
+            <p class="text-zinc-400 text-xs mt-1">
+              @if (selectedSort() === 'trending_week') {
+                🔥 Most popular TV shows this week on TMDB
+              } @else {
+                Explore all shows, filter by streaming platform, genres and rankings
+              }
+            </p>
           </div>
 
           <!-- Sort & Dropdown Filters -->
@@ -212,7 +218,7 @@ import { ShowStateService } from '../../services/show-state.service';
               <svg class="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
 
-            @if (selectedGenres().length > 0 || selectedDecade() || selectedProvider() || selectedType() !== 'all' || selectedSort() !== 'popularity.desc') {
+            @if (hasActiveFilters()) {
               <button 
                 (click)="resetFilters()"
                 class="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all font-bold text-[10px] uppercase flex items-center gap-1">
@@ -462,10 +468,19 @@ export class TrendingComponent implements OnInit, OnDestroy {
 
   /** Filters signals. */
   selectedProvider = signal<number | null>(null);
-  selectedSort = signal<string>('popularity.desc');
+  selectedSort = signal<string>('trending_week');
   selectedGenres = signal<string[]>([]);
   selectedDecade = signal<string | null>(null);
   selectedType = signal<'all' | 'miniseries' | 'series'>('all');
+
+  /** True when any non-default filter or sort option is active */
+  hasActiveFilters = computed(() => {
+    return this.selectedGenres().length > 0 ||
+           this.selectedDecade() !== null ||
+           this.selectedProvider() !== null ||
+           this.selectedType() !== 'all' ||
+           this.selectedSort() !== 'trending_week';
+  });
 
   activeDropdown = signal<'sort' | 'genre' | 'decade' | 'type' | null>(null);
 
@@ -473,7 +488,8 @@ export class TrendingComponent implements OnInit, OnDestroy {
   providers = POPULAR_PROVIDERS;
 
   sortOptions = [
-    { label: '🔥 Most Popular', value: 'popularity.desc' },
+    { label: '🔥 Trending This Week', value: 'trending_week' },
+    { label: '📈 All-Time Popular', value: 'popularity.desc' },
     { label: '★ Highest Rated', value: 'vote_average.desc' },
     { label: '📅 Newest Releases', value: 'first_air_date.desc' }
   ];
@@ -547,23 +563,38 @@ export class TrendingComponent implements OnInit, OnDestroy {
 
   loadCatalog(): void {
     this.loading.set(true);
-    this.tmdb.discoverShows({
-      page: this.currentPage(),
-      sortBy: this.selectedSort(),
-      providerId: this.selectedProvider(),
-      genreNames: this.selectedGenres(),
-      decade: this.selectedDecade(),
-      typeFilter: this.selectedType() === 'all' ? null : this.selectedType()
-    }).subscribe(res => {
-      this.loading.set(false);
-      this.shows.set(res.shows);
-      this.totalPages.set(res.totalPages);
-    });
+
+    const isTrendingWeek = this.selectedSort() === 'trending_week';
+    const hasCustomFilters = this.selectedProvider() !== null ||
+                             this.selectedGenres().length > 0 ||
+                             this.selectedDecade() !== null ||
+                             this.selectedType() !== 'all';
+
+    if (isTrendingWeek && !hasCustomFilters) {
+      this.tmdb.getTrendingShowsPaged(this.currentPage()).subscribe(res => {
+        this.loading.set(false);
+        this.shows.set(res.shows);
+        this.totalPages.set(res.totalPages);
+      });
+    } else {
+      this.tmdb.discoverShows({
+        page: this.currentPage(),
+        sortBy: isTrendingWeek ? 'popularity.desc' : this.selectedSort(),
+        providerId: this.selectedProvider(),
+        genreNames: this.selectedGenres(),
+        decade: this.selectedDecade(),
+        typeFilter: this.selectedType() === 'all' ? null : this.selectedType()
+      }).subscribe(res => {
+        this.loading.set(false);
+        this.shows.set(res.shows);
+        this.totalPages.set(res.totalPages);
+      });
+    }
   }
 
   getSortLabel(): string {
     const opt = this.sortOptions.find(o => o.value === this.selectedSort());
-    return opt ? opt.label : 'Popularity';
+    return opt ? opt.label : 'Trending This Week';
   }
 
   getGenreLabel(): string {
@@ -628,7 +659,7 @@ export class TrendingComponent implements OnInit, OnDestroy {
   resetFilters(): void {
     this.searchQuery = '';
     this.selectedProvider.set(null);
-    this.selectedSort.set('popularity.desc');
+    this.selectedSort.set('trending_week');
     this.selectedGenres.set([]);
     this.selectedDecade.set(null);
     this.selectedType.set('all');
