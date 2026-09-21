@@ -86,7 +86,9 @@ export class ShowStateService {
         }
         this.watchedShows.set(localWatched);
       } else {
-        // Server has data: repair timestamps.
+        // Server has data: repair timestamps and use server as source of truth.
+        // We do NOT merge local items that are missing from the server — those
+        // were intentionally deleted from another device and should stay deleted.
         const baseNow = Date.now();
         const repairedRemote = remoteWatched.map((w, index) => {
           let ts = this.getShowTimestamp(w);
@@ -96,23 +98,7 @@ export class ShowStateService {
           return { ...w, addedAt: ts };
         });
 
-        // Smart merge: detect local items that the server doesn't have.
-        // This happens when a previous upsert failed (network error, token
-        // expired, etc.). We keep those local items and retry the upsert so
-        // the server eventually catches up — instead of silently discarding them.
-        const serverIds = new Set(repairedRemote.map(w => w.instanceId));
-        const unsyncedLocal = localWatched.filter(w => !serverIds.has(w.instanceId));
-
-        if (unsyncedLocal.length > 0) {
-          for (const item of unsyncedLocal) {
-            this.supabaseService.upsertWatchedShow(userId, item).catch(err =>
-              console.error('Error re-syncing unsynced local watched show:', err)
-            );
-          }
-          this.watchedShows.set(this.sortByAddedAt([...repairedRemote, ...unsyncedLocal]));
-        } else {
-          this.watchedShows.set(this.sortByAddedAt(repairedRemote));
-        }
+        this.watchedShows.set(this.sortByAddedAt(repairedRemote));
       }
 
       // --- Pending shows ---
@@ -123,20 +109,10 @@ export class ShowStateService {
         }
         this.pendingShows.set(localPending);
       } else {
-        // Smart merge for pending: keep unsynced local items.
-        const serverPendingIds = new Set(remotePending.map(p => p.id));
-        const unsyncedPending = localPending.filter(p => !serverPendingIds.has(p.id));
-
-        if (unsyncedPending.length > 0) {
-          for (const item of unsyncedPending) {
-            this.supabaseService.upsertPendingShow(userId, item).catch(err =>
-              console.error('Error re-syncing unsynced local pending show:', err)
-            );
-          }
-          this.pendingShows.set([...remotePending, ...unsyncedPending]);
-        } else {
-          this.pendingShows.set(remotePending);
-        }
+        // Server has data: use it as the source of truth.
+        // We do NOT merge local pending items missing from the server — those
+        // were intentionally deleted or moved to watched from another device.
+        this.pendingShows.set(remotePending);
       }
 
       // Persist the merged result to localStorage as a fresh cache.
