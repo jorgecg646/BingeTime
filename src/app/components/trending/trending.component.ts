@@ -23,7 +23,7 @@ import { ShowStateService } from '../../services/show-state.service';
       @if (heroShow()) {
         <div class="relative w-full rounded-3xl overflow-hidden mb-10 border border-white/10 shadow-2xl bg-slate-950 aspect-[16/9] md:aspect-[21/8] max-h-[460px] flex items-end">
           @if (heroShow()!.backdrop_path) {
-            <img [src]="heroShow()!.backdrop_path" [alt]="heroShow()!.name" class="absolute inset-0 w-full h-full object-cover opacity-45 scale-105 transform hover:scale-100 transition-transform duration-700" />
+            <img [src]="heroShow()!.backdrop_path" [alt]="heroShow()!.name" fetchpriority="high" decoding="async" class="absolute inset-0 w-full h-full object-cover opacity-45 scale-105 transform hover:scale-100 transition-transform duration-700" />
           }
           <div class="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
           <div class="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent"></div>
@@ -270,12 +270,15 @@ import { ShowStateService } from '../../services/show-state.service';
 
       <!-- 📺 Grid of Shows -->
       @if (loading()) {
-        <div class="flex flex-col items-center justify-center py-24">
-          <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p class="text-zinc-400 text-sm font-semibold">Loading productions from TMDB...</p>
+        <div role="status" aria-live="polite" aria-label="Loading shows" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <span class="sr-only">Loading productions from TMDB...</span>
+          @for (placeholder of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]; track placeholder) {
+            <div aria-hidden="true" class="animate-pulse">
+              <div class="aspect-[2/3] rounded-2xl border border-white/5 bg-white/10"></div>
+              <div class="mt-3 h-3 w-3/4 rounded bg-white/10"></div>
+              <div class="mt-2 h-2.5 w-1/2 rounded bg-white/5"></div>
+            </div>
+          }
         </div>
       } @else if (shows().length === 0) {
         <div class="flex flex-col items-center justify-center py-20 text-center">
@@ -287,7 +290,7 @@ import { ShowStateService } from '../../services/show-state.service';
           @for (show of shows(); track show.id; let i = $index) {
             <div class="group cursor-pointer animate-slide-up" (click)="openDetails.emit(show)">
               <div class="relative aspect-[2/3] overflow-hidden rounded-2xl shadow-md hover-lift mb-2 border border-white/5 group-hover:border-white/20 transition-all">
-                <img [src]="show.poster_path" [alt]="show.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <img [src]="show.poster_path" [alt]="show.name" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 
                 @if (state.isWatched(show.id)) {
                   <div class="absolute top-2 left-2 w-6 h-6 bg-emerald-500/95 text-white rounded-full flex items-center justify-center border border-emerald-400/30 backdrop-blur-sm shadow-lg z-20 animate-fade-in" title="Watched">

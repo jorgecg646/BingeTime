@@ -1,5 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, of, forkJoin, map, catchError } from 'rxjs';
 import { TVShow, Season, NewEpisodeInfo, WatchProvider, SeasonDetail, EpisodeDetail, PersonDetail, PersonTvCreditShow } from '../models';
 import { environment } from '../../environments/environment';
@@ -81,7 +81,6 @@ export class TmdbService {
   private http = inject(HttpClient);
   private baseUrl = environment.tmdbBaseUrl || 'https://api.themoviedb.org/3';
   private imageBaseUrl = environment.tmdbImageBaseUrl || 'https://image.tmdb.org/t/p';
-  private topRatedShowsCache: TVShow[] | null = null;
   private showDetailsCache = new Map<number, TVShow>();
   private seasonDetailsCache = new Map<string, SeasonDetail>();
   private personDetailsCache = new Map<number, PersonDetail>();
@@ -90,6 +89,7 @@ export class TmdbService {
   private recommendationsCache = new Map<number, TVShow[]>();
 
   readonly COUNTRIES = SUPPORTED_COUNTRIES;
+  readonly apiError = signal<string | null>(null);
   readonly selectedCountry = signal<string>(this.getInitialCountryCode());
   readonly isRegionModalOpen = signal<boolean>(false);
   readonly activePersonModalId = signal<number | null>(null);
@@ -101,6 +101,31 @@ export class TmdbService {
   });
   readonly activeCountryFlagUrl = computed(() => this.activeCountryInfo().flagUrl);
   readonly activeCountryName = computed(() => this.activeCountryInfo().name);
+
+  dismissApiError(): void {
+    this.apiError.set(null);
+  }
+
+  private reportApiError(operation: string, error: unknown): void {
+    const status = error instanceof HttpErrorResponse ? error.status : null;
+    console.error(`TMDB ${operation} request failed${status === null ? '' : ` (HTTP ${status})`}.`);
+    this.apiError.set(
+      status === 401 || status === 403
+        ? 'TMDB rejected the request. Please check the API configuration.'
+        : 'TMDB data could not be loaded. Check your connection and try again.'
+    );
+  }
+
+  private getProvidersForCountry(
+    providersByCountry: Record<string, WatchProvider[]>
+  ): WatchProvider[] {
+    const country = this.getUserCountryCode();
+    return providersByCountry[country]
+      || providersByCountry['ES']
+      || providersByCountry['US']
+      || Object.values(providersByCountry)[0]
+      || [];
+  }
 
   openRegionModal(): void {
     this.isRegionModalOpen.set(true);
@@ -225,9 +250,15 @@ export class TmdbService {
     });
 
     const enReq = this.http.get<any>(`${this.baseUrl}/search/tv`, { headers: this.getHeaders(), params: enParams })
-      .pipe(catchError(() => of({ results: [] })));
+      .pipe(catchError(error => {
+        this.reportApiError('search', error);
+        return of({ results: [] });
+      }));
     const esReq = this.http.get<any>(`${this.baseUrl}/search/tv`, { headers: this.getHeaders(), params: esParams })
-      .pipe(catchError(() => of({ results: [] })));
+      .pipe(catchError(error => {
+        this.reportApiError('search', error);
+        return of({ results: [] });
+      }));
 
     return forkJoin([enReq, esReq]).pipe(
       map(([enRes, esRes]) => {
@@ -305,7 +336,7 @@ export class TmdbService {
         });
       }),
       catchError(err => {
-        console.error('TMDB search error:', err);
+        this.reportApiError('search', err);
         return of([]);
       })
     );
@@ -320,7 +351,11 @@ export class TmdbService {
    */
   getShowDetails(showId: number): Observable<TVShow | null> {
     if (this.showDetailsCache.has(showId)) {
-      return of(this.showDetailsCache.get(showId)!);
+      const cached = this.showDetailsCache.get(showId)!;
+      return of({
+        ...cached,
+        watch_providers: this.getProvidersForCountry(cached.all_watch_providers || {})
+      });
     }
 
     const params = this.createParams({
@@ -380,7 +415,6 @@ export class TmdbService {
         }
 
         // 1. Streaming Providers by Country
-        const userCountry = this.getUserCountryCode();
         const wpResults = details['watch/providers']?.results;
         const allProviders: Record<string, WatchProvider[]> = {};
         if (wpResults) {
@@ -397,7 +431,7 @@ export class TmdbService {
           }
         }
         mapped.all_watch_providers = allProviders;
-        mapped.watch_providers = allProviders[userCountry] || allProviders['ES'] || allProviders['US'] || Object.values(allProviders)[0] || [];
+        mapped.watch_providers = this.getProvidersForCountry(allProviders);
 
         // 2. Videos / Official YouTube Trailers
         if (details.videos?.results && Array.isArray(details.videos.results)) {
@@ -450,7 +484,7 @@ export class TmdbService {
         return mapped;
       }),
       catchError(err => {
-        console.error('TMDB show details error:', err);
+        this.reportApiError('show details', err);
         return of(null);
       })
     );
@@ -489,10 +523,7 @@ export class TmdbService {
       return this.http.get<any>(`${this.baseUrl}/discover/tv`, {
         headers: this.getHeaders(),
         params
-      }).pipe(
-        map(res => res.results || []),
-        catchError(() => of([]))
-      );
+      }).pipe(map(res => res.results || []));
     });
 
     return forkJoin(requests).pipe(
@@ -515,7 +546,7 @@ export class TmdbService {
         return top250;
       }),
       catchError(err => {
-        console.error('TMDB top 250 error:', err);
+        this.reportApiError('top 250', err);
         return of([]);
       })
     );
@@ -545,7 +576,10 @@ export class TmdbService {
         this.recommendationsCache.set(showId, shows);
         return shows;
       }),
-      catchError(() => of([]))
+      catchError(error => {
+        this.reportApiError('recommendations', error);
+        return of([]);
+      })
     );
   }
 
@@ -627,7 +661,7 @@ export class TmdbService {
         return result;
       }),
       catchError(err => {
-        console.error('TMDB discover error:', err);
+        this.reportApiError('discovery', err);
         return of({ page: 1, totalPages: 1, totalResults: 0, shows: [] });
       })
     );
@@ -657,7 +691,7 @@ export class TmdbService {
         return res.results.map((item: any) => this.mapShow(item));
       }),
       catchError(err => {
-        console.error('TMDB discover by provider error:', err);
+        this.reportApiError('provider discovery', err);
         return of([]);
       })
     );
@@ -691,7 +725,7 @@ export class TmdbService {
         return mapped;
       }),
       catchError(err => {
-        console.error('TMDB trending error:', err);
+        this.reportApiError('trending', err);
         return of([]);
       })
     );
@@ -750,7 +784,10 @@ export class TmdbService {
 
         return episodes;
       }),
-      catchError(() => of([]))
+      catchError(error => {
+        this.reportApiError('recent episodes', error);
+        return of([]);
+      })
     );
   }
 
@@ -802,7 +839,7 @@ export class TmdbService {
         return detail;
       }),
       catchError(err => {
-        console.error(`Error fetching season ${seasonNumber} for show ${showId}:`, err);
+        this.reportApiError(`season ${seasonNumber} for show ${showId}`, err);
         return of(null);
       })
     );
@@ -825,7 +862,10 @@ export class TmdbService {
       params
     }).pipe(
       map(res => (res?.results || []).filter((s: any) => s.poster_path).map((s: any) => this.mapShow(s))),
-      catchError(() => of([]))
+      catchError(error => {
+        this.reportApiError('upcoming shows', error);
+        return of([]);
+      })
     );
   }
 
@@ -844,7 +884,10 @@ export class TmdbService {
         shows: (res?.results || []).filter((s: any) => s.poster_path).map((s: any) => this.mapShow(s)),
         totalPages: Math.min(res?.total_pages || 1, 20)
       })),
-      catchError(() => of({ shows: [], totalPages: 1 }))
+      catchError(error => {
+        this.reportApiError('airing today', error);
+        return of({ shows: [], totalPages: 1 });
+      })
     );
   }
 
@@ -863,7 +906,10 @@ export class TmdbService {
         shows: (res?.results || []).filter((s: any) => s.poster_path).map((s: any) => this.mapShow(s)),
         totalPages: Math.min(res?.total_pages || 1, 20)
       })),
-      catchError(() => of({ shows: [], totalPages: 1 }))
+      catchError(error => {
+        this.reportApiError('on the air', error);
+        return of({ shows: [], totalPages: 1 });
+      })
     );
   }
 
@@ -1002,7 +1048,7 @@ export class TmdbService {
         return person;
       }),
       catchError(err => {
-        console.error('Error fetching person details from TMDB:', err);
+        this.reportApiError('person details', err);
         return of({
           id: personId,
           name: 'Unknown',

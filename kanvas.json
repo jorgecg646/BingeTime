@@ -1,0 +1,435 @@
+{
+  "kanvas": 1,
+  "title": "BingeTime",
+  "groups": [
+    {
+      "id": "PR",
+      "name": "Performance"
+    },
+    {
+      "id": "AR",
+      "name": "Architecture"
+    },
+    {
+      "id": "CQ",
+      "name": "Code Quality"
+    },
+    {
+      "id": "FT",
+      "name": "Features"
+    },
+    {
+      "id": "DV",
+      "name": "DevOps"
+    },
+    {
+      "id": "DC",
+      "name": "Documentation"
+    },
+    {
+      "id": "SC",
+      "name": "Security"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "PR-02",
+      "title": "Optimize change detection in measured hot spots",
+      "state": "todo",
+      "group": "PR",
+      "deps": ["PR-08"],
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Measure rendering and change-detection cost first, then apply OnPush only to components where it addresses an observed bottleneck. Define before-and-after checks for the selected screens and verify that updates and interactions still render correctly.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:11:55Z",
+          "by": "copilot",
+          "text": "Narrowed to evidence-based, component-level optimization."
+        },
+        {
+          "at": "2026-10-29T15:34:42Z",
+          "by": "agent",
+          "text": "Plan: measure the current change-detection behavior and build setup, identify any demonstrated component bottlenecks, then apply only evidence-backed Angular optimizations and run targeted checks."
+        },
+        {
+          "at": "2026-10-29T15:35:22Z",
+          "by": "agent",
+          "text": "Paused: the saved baseline measures build size and route timings, but not Angular change-detection cost; most substantial screen components already use OnPush. No further OnPush change is justified without profiling representative screens first."
+        },
+        {
+          "at": "2026-10-29T16:14:01Z",
+          "by": "copilot",
+          "text": "Plan: inspect available Angular profiling options, measure representative rendering/change-detection behavior if possible, and apply OnPush only to components where profiling demonstrates a bottleneck; otherwise record the evidence and pause without speculative changes."
+        },
+        {
+          "at": "2026-10-29T16:14:27Z",
+          "by": "copilot",
+          "text": "Paused without a code change: a fresh audit confirms the major list, search, calendar, stats, and detail components already use OnPush. This workspace has no component-level profiling trace, so there is no evidence-based target for additional change-detection optimization. Resume only with a representative Angular DevTools profile identifying a hot component."
+        }
+      ]
+    },
+    {
+      "id": "PR-04",
+      "title": "Measure and reduce production bundle size",
+      "state": "done",
+      "group": "PR",
+      "deps": ["PR-08"],
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Record the production build output and identify the largest bundles using tooling compatible with Angular application builder. Compare against the existing budgets in angular.json, then make and verify only changes that reduce shipped code without breaking routes or features.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:11:56Z",
+          "by": "copilot",
+          "text": "Aligned the task with the existing Angular builder and budgets."
+        },
+        {
+          "at": "2026-10-28T21:28:50Z",
+          "by": "copilot",
+          "text": "Baseline finding: routes use loadComponent, but src/main.ts configures withPreloading(PreloadAllModules). The initial browser run made 13 local JS requests after startup, so the task should measure both the initial bundle and follow-up/preloaded route-chunk traffic. Consider the preloading policy as part of reducing network cost; compare navigation responsiveness before changing it, and verify representative routes."
+        },
+        {
+          "at": "2026-10-29T15:35:23Z",
+          "by": "agent",
+          "text": "Plan: reproduce the recorded production bundle baseline, inspect largest emitted chunks and loading policy, make a measurable reduction without harming route loading, and verify with production builds and route checks."
+        },
+        {
+          "at": "2026-10-29T15:40:10Z",
+          "by": "agent",
+          "text": "Startup now leaves route chunks lazy instead of fetching all routes immediately. The production build succeeds; initial bundle is 517.62 kB (down 1.72 kB from 519.34 kB), and the production browser loaded 8 app JS files on Your Shows rather than 13 with preloading. Navigated successfully through Discover, Top 250, Calendar, Stats, Your Shows, and Auth. Check the first-load vs. first-navigation tradeoff; the initial-budget warning remains 17.62 kB over 500 kB."
+        }
+      ]
+    },
+    {
+      "id": "PR-05",
+      "title": "Add installable PWA with static asset caching",
+      "state": "done",
+      "group": "PR",
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Provide a web app manifest, installability, and service-worker caching for the application shell and static assets. Do not include TMDB API/offline data caching, background sync, or push notifications in this task; those need separate requirements.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:11:57Z",
+          "by": "copilot",
+          "text": "Merged the overlapping PWA proposals and reduced scope."
+        },
+        {
+          "at": "2026-10-29T16:14:38Z",
+          "by": "copilot",
+          "text": "Plan: inspect the Angular build and current deployment/asset setup, add a minimal installable PWA with safe static-asset caching, then validate the production build and service-worker output."
+        },
+        {
+          "at": "2026-10-29T16:25:06Z",
+          "by": "copilot",
+          "text": "BingeTime now has its branded installable manifest and PNG icons, plus an Angular service worker that prefetches the app shell and lazily caches static assets only. TMDB/API data, background sync, and push remain uncached. Verified production output, automatic worker activation in the browser, and app-shell rendering after an offline reload; all 11 tests and TypeScript compilation pass. Please check the install prompt and offline shell on your deployment's HTTPS origin."
+        }
+      ]
+    },
+    {
+      "id": "CQ-01",
+      "title": "Test critical service and user behaviors",
+      "state": "done",
+      "group": "CQ",
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Add focused Jasmine unit tests for important behavior in authentication, show-state synchronization and persistence, and TMDB data handling. Cover success, empty, and failure cases where applicable; use meaningful behavior assertions rather than a fixed coverage percentage.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:11:58Z",
+          "by": "copilot",
+          "text": "Replaced the arbitrary coverage target with behavior-based acceptance criteria."
+        },
+        {
+          "at": "2026-10-29T15:40:11Z",
+          "by": "agent",
+          "text": "Plan: inspect current test setup and core auth, show-state, and TMDB behavior, then add focused Jasmine tests for the most consequential success, empty, and failure cases and run the test suite."
+        },
+        {
+          "at": "2026-10-29T15:43:43Z",
+          "by": "agent",
+          "text": "Encontré que npm test falla porque angular.json no define un target test; deps Jasmine/Karma ya están instaladas. Estoy añadiendo configuración de pruebas antes de escribir los tests de servicios."
+        },
+        {
+          "at": "2026-10-29T15:58:09Z",
+          "by": "agent",
+          "text": "Jasmine/Karma now runs from npm test, with 8 behavior-focused passing tests across AuthService, ShowStateService and TmdbService. Verified both npm test and npm run build; the existing 500 kB initial-bundle and auth-CSS warnings remain. Check the service behavior specs and test command before accepting."
+        }
+      ]
+    },
+    {
+      "id": "CQ-02",
+      "title": "Add E2E tests for core viewing flows",
+      "state": "proposed",
+      "group": "CQ",
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Add a small Playwright suite for sign-in, show discovery, adding/removing a show, and opening calendar or stats pages. Keep external services deterministic through suitable test data or mocks, and document the command to run the suite.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:11:59Z",
+          "by": "copilot",
+          "text": "Kept scope to key flows without requiring a unit-test coverage threshold."
+        }
+      ]
+    },
+    {
+      "id": "AR-02",
+      "title": "Make API and sync errors clear and actionable",
+      "state": "done",
+      "group": "AR",
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Review failures from TMDB requests and Neon synchronization; provide clear user feedback where the user can recover and useful diagnostics without exposing sensitive data. Add retry behavior only for transient, safe-to-repeat requests. Avoid a generic interceptor unless it fits the actual HTTP setup.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:11:59Z",
+          "by": "copilot",
+          "text": "Focused handling on observable API and synchronization failure modes."
+        },
+        {
+          "at": "2026-10-29T15:58:10Z",
+          "by": "agent",
+          "text": "Plan: trace where TMDB and Neon failures reach users, distinguish recoverable from background errors, then add clear actionable feedback and focused checks while preserving existing local data and retry safety."
+        },
+        {
+          "at": "2026-10-29T16:05:03Z",
+          "by": "agent",
+          "text": "TMDB and cloud-sync failures now show dismissible, accessible alerts with a safe recovery message; TMDB offers a page reload to repeat its read requests. Failure diagnostics now report operation and HTTP status without logging response bodies, URLs, or tokens. Local show data remains available after cloud failures. Verified 9 Jasmine tests and a production build; review that the notices are clear and that an explicit reload is acceptable for retrying catalog reads."
+        }
+      ]
+    },
+    {
+      "id": "PR-06",
+      "title": "Review and complete TMDB response caching",
+      "state": "done",
+      "group": "PR",
+      "deps": ["PR-08"],
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Audit the existing caches in TmdbService before adding anything. Verify cache keys, freshness, and invalidation for show details, season/person details, discovery, trending, and recommendations; fill only demonstrated gaps and test that changed parameters do not return stale results.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:12:00Z",
+          "by": "copilot",
+          "text": "Accounts for caches already present in TmdbService."
+        },
+        {
+          "at": "2026-10-29T16:05:04Z",
+          "by": "agent",
+          "text": "Plan: audit each in-memory TMDB cache for parameter-complete keys, freshness/invalidation and failed-result behavior; add focused tests and fill only demonstrated gaps."
+        },
+        {
+          "at": "2026-10-29T16:07:41Z",
+          "by": "agent",
+          "text": "TMDB details now recalculate country-specific providers from the cached all-country data; provider discovery is invalidated on region change. Failed Top 250 page requests no longer cache a partial ranking, so users can request it again. Audited detail, season, person, recommendation, trending and discovery keys/behavior; these caches are memory-only and refresh on page reload. Added tests for region changes and failed Top 250 retries. Verified 11 tests and production build; review that session-only freshness is sufficient."
+        }
+      ]
+    },
+    {
+      "id": "FT-01",
+      "title": "Add skeleton loading states to key screens",
+      "state": "done",
+      "group": "FT",
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Add content-shaped loading placeholders to the screens where asynchronous waits are most visible, such as show lists and search. Preserve accessible loading status and existing error/empty states; do not make this dependent on API caching.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:12:01Z",
+          "by": "copilot",
+          "text": "Made this an independent UX improvement, not gated on caching."
+        },
+        {
+          "at": "2026-10-29T16:07:42Z",
+          "by": "agent",
+          "text": "Plan: identify primary async loading screens and existing skeleton patterns, add content-shaped accessible placeholders while preserving empty/error states, then validate loading and resolved views."
+        },
+        {
+          "at": "2026-10-29T16:11:37Z",
+          "by": "copilot",
+          "text": "Search, Discover, Top 250, and Calendar now show accessible content-shaped skeletons while retaining their resolved content and existing error/empty behavior. Verified with the production build and all 11 Jasmine tests. Please check the loading placeholders across those screens."
+        }
+      ]
+    },
+    {
+      "id": "PR-07",
+      "title": "Optimize loading of TMDB posters and backdrops",
+      "state": "done",
+      "group": "PR",
+      "deps": ["PR-08"],
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Use Angular optimized image loading where suitable, request appropriate TMDB image sizes, and defer off-screen artwork. Check the major show-list and background views for layout stability, successful loading, and reduced unnecessary image bytes. Do not introduce a third-party image proxy without evidence that TMDB image delivery is insufficient.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:12:21Z",
+          "by": "copilot",
+          "text": "Removed unnecessary external image-proxy scope and focused on TMDB delivery."
+        },
+        {
+          "at": "2026-10-28T21:28:50Z",
+          "by": "copilot",
+          "text": "Baseline limitation: local TMDB API requests returned HTTP 401 and image requests could not be measured reliably. Re-run image transfer, dimensions, and layout-stability checks with working TMDB credentials and valid show data before deciding what image optimization is needed."
+        },
+        {
+          "at": "2026-10-29T16:11:48Z",
+          "by": "copilot",
+          "text": "Plan: audit TMDB image rendering on major list and background views; apply native Angular/TMDB optimizations that fit the existing app; validate the build, image URL sizes, lazy behavior, and layout stability."
+        },
+        {
+          "at": "2026-10-29T16:13:39Z",
+          "by": "copilot",
+          "text": "Off-screen posters and backdrops now use native lazy loading and async decoding across the main list, search, calendar, and stats views; the visible Discover hero is prioritized. Existing TMDB URLs already use w342 posters and w1280 backdrops, and fixed card ratios preserve layout stability. Production build and all 11 tests pass. Live image transfer checks remain unverified because the saved baseline reports TMDB API requests returning 401; please recheck with working credentials and real data."
+        }
+      ]
+    },
+    {
+      "id": "DV-03",
+      "title": "Measure Core Web Vitals in production",
+      "state": "proposed",
+      "group": "DV",
+      "at": "2026-10-28T20:55:01Z",
+      "by": "agent",
+      "desc": "Capture and review LCP, INP, and CLS for real user sessions or representative production runs, with a privacy-conscious approach. Report a baseline and trends; do not add product analytics or an external error-tracking service as part of this task.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:12:22Z",
+          "by": "copilot",
+          "text": "Separated performance measurement from feature flags and product analytics."
+        }
+      ]
+    },
+    {
+      "id": "PR-08",
+      "title": "Establish a performance baseline before optimization",
+      "state": "done",
+      "group": "PR",
+      "at": "2026-10-28T21:12:33Z",
+      "by": "copilot",
+      "desc": "Measure production bundle sizes, initial load and key screen rendering, and image/network usage on representative routes. Record the commands, environment, and results so later optimization proposals can be judged against the same baseline. This task is complete when the baseline and reproducible measurement steps are recorded for the team.",
+      "notes": [
+        {
+          "at": "2026-10-28T21:16:55Z",
+          "by": "agent",
+          "text": "Plan: capture a reproducible production build size report and browser performance measurements for the key routes; record environment, commands, limitations, and results so optimization tasks have a defensible baseline."
+        },
+        {
+          "at": "2026-10-28T21:24:39Z",
+          "by": "agent",
+          "text": "Baseline recorded for the production build. Reproduce with `pnpm exec ng build --configuration production --stats-json`; serve `dist/tv-time-calculator/browser` as static files (not `ng serve`), then record one local-browser navigation and the transfer sizes by resource type.\n- Build: initial 519.10 kB raw / 128.78 kB estimated transfer, 19.10 kB above the 500 kB warning budget (below the 1 MB error budget). Auth component CSS is 6.05 kB, 2.05 kB above its 4 kB warning budget.\n- Code splitting: route chunks are present (your-shows 68.51 kB; discover 35.01 kB; calendar 30.26 kB; top-series 29.43 kB; stats 26.87 kB; auth 22.60 kB). `withPreloading(PreloadAllModules)` in `src/main.ts` means they are fetched after startup; the local browser saw 13 JS files and one CSS file.\n- One local static-build browser run on Windows: responseStart 25 ms, DOMContentLoaded 536 ms, load 1,440 ms; local assets transferred 737,664 bytes with compression disabled. Treat timings as a lab reference only, not production-user/Core Web Vitals data. The build output also contains `icon.avif` (1,330,006 bytes); this is emitted asset size, not evidence it was downloaded on the measured route.\n- Checked Your Shows, Discover, Top 250, Calendar, and Stats screens. TMDB returned HTTP 401 in this local session, so catalog results and poster/image network usage were not representative. Repeat those measurements with working local TMDB credentials and a deployed/representative network before drawing conclusions."
+        }
+      ]
+    },
+    {
+      "id": "DC-01",
+      "title": "Document codebase architecture and modules for AI context",
+      "state": "review",
+      "group": "DC",
+      "at": "2026-10-29T16:32:03Z",
+      "by": "antigravity",
+      "desc": "Document the complete application architecture, module breakdown, and workflows so AI agents and new developers can quickly understand and navigate the codebase without ambiguity.\n\nScope includes:\n1. High-level architecture and technology stack (Angular 19, standalone components, Tailwind, Netlify functions, Neon Postgres).\n2. Directory structure and core modules (components, services, models, guards, utilities).\n3. Data flow and state management (local storage vs. remote Neon Postgres sync, offline-first approach).\n4. External APIs and integrations (TMDB/TVMaze endpoints, authentication, caching strategy).\n5. Development, testing, and deployment workflows (environments, build, test commands).\n\nFinished when structured documentation (e.g., in a `docs/` folder or root context guides) is established and ready for AI ingestion.",
+      "notes": [
+        {
+          "at": "2026-10-29T16:34:10Z",
+          "by": "antigravity",
+          "text": "Plan: 1. Survey the codebase architecture, models, services, components, Netlify functions, and sync logic. 2. Create structured, comprehensive documentation in docs/ and AI context files covering architecture, data flow, services, and developer workflows. 3. Verify documentation against the actual codebase."
+        },
+        {
+          "at": "2026-10-29T16:40:29Z",
+          "by": "antigravity",
+          "text": "Created comprehensive, structured documentation in `docs/` so any AI agent or human developer can immediately understand and navigate the codebase with complete clarity:\n\n- `docs/AI_AGENT_GUIDE.md`: Dedicated guide for AI assistants containing the system mental model, 7 critical gotchas (e.g. SupabaseService naming, generated environment files, signals vs RxJS, instanceId format), and implementation playbooks.\n- `docs/ARCHITECTURE.md`: System design, tech stack (Angular 19, Tailwind CSS, Neon Postgres), layer architecture, and Mermaid system diagram.\n- `docs/STATE_AND_SYNC.md`: Signal registry, two-tier storage (offline-first localStorage + Neon Postgres), conflict resolution, and TVMaze-to-TMDB legacy migration.\n- `docs/API_AND_INTEGRATIONS.md`: TMDB v3 API contracts, in-memory caching, Netlify Functions (`/api/shows`), and local API server emulation.\n- `docs/COMPONENTS_AND_ROUTING.md`: Complete component catalog, route table, guards, and modal interaction flows.\n- `docs/DEVELOPMENT_AND_TESTING.md`: Environment setup, `set-env.js` automation, PWA service worker, and testing guidelines.\n- `docs/README.md`: Central documentation index.\n- Updated `AGENTS.md` and `README.md` with links and updated TMDB API references.\n\nVerification:\n- Executed `pnpm test` (all 11 unit tests passed).\n- Executed `pnpm run build` (production build compiled successfully).\n\nCheck:\n- Review the files in `docs/` (especially `docs/AI_AGENT_GUIDE.md`) to verify clarity and completeness."
+        }
+      ]
+    },
+    {
+      "id": "SC-01",
+      "title": "Validate input schemas and enforce payload size limits in shows function",
+      "state": "done",
+      "group": "SC",
+      "at": "2026-10-29T16:56:04Z",
+      "by": "antigravity",
+      "desc": "Add strict input validation to netlify/functions/shows.js. Enforce reasonable payload size limits, validate that item.show has a valid numeric ID, clamp user ratings between 0 and 10, ensure positive integers for seasons and episodes, and sanitize show_data JSON to store only necessary show metadata rather than arbitrary nested blobs. Finished when malformed, oversized, or out-of-bounds payloads are cleanly rejected with HTTP 400 Bad Request before hitting the database.",
+      "notes": [
+        {
+          "at": "2026-10-29T16:58:58Z",
+          "by": "agent",
+          "text": "Plan: inspect the shows endpoint, its existing tests and callers; implement bounded schema validation and sanitized metadata storage, then run focused checks."
+        },
+        {
+          "at": "2026-10-29T17:02:34Z",
+          "by": "agent",
+          "text": "Malformed and oversized write payloads now return 400 before SQL, watched/pending fields and identifiers are bounded, ratings clamp to 0–10, and persisted show metadata is whitelisted. Verified syntax plus an endpoint harness covering rejection-before-database, metadata stripping, nullable poster paths, and rating clamping."
+        }
+      ]
+    },
+    {
+      "id": "SC-02",
+      "title": "Sanitize error responses and restrict CORS origins in shows function",
+      "state": "done",
+      "group": "SC",
+      "deps": ["SC-01"],
+      "at": "2026-10-29T16:56:04Z",
+      "by": "antigravity",
+      "desc": "Harden netlify/functions/shows.js against information leakage and unauthorized cross-origin requests. Replace raw error.message in 500 responses with sanitized user-facing error messages while keeping detailed technical logs server-side. Replace the wildcard Access-Control-Allow-Origin: * with an allowlist restricted to the verified site domain (process.env.URL, production Netlify domain, and local dev server). Finished when database errors no longer leak internal SQL/Neon details and cross-origin preflight requests enforce origin checks.",
+      "notes": [
+        {
+          "at": "2026-10-29T17:03:01Z",
+          "by": "agent",
+          "text": "Plan: use an exact origin allowlist from Netlify URL, the production domain, and local dev origins; deny unapproved preflights and return generic client errors while retaining server logs."
+        },
+        {
+          "at": "2026-10-29T17:03:42Z",
+          "by": "agent",
+          "text": "Server failures now return only a generic 500 while detailed errors remain in server logs. CORS responses reflect only the configured Netlify URL, production domain, and local dev origins; disallowed/missing preflight origins receive 403 without an allow-origin header. Verified syntax, allowed and rejected preflights, allowed localhost, and hidden database details."
+        }
+      ]
+    },
+    {
+      "id": "SC-03",
+      "title": "Add automated validation and security test suite for shows function",
+      "state": "done",
+      "group": "SC",
+      "deps": ["SC-02"],
+      "at": "2026-10-29T16:56:04Z",
+      "by": "antigravity",
+      "desc": "Create focused automated tests covering netlify/functions/shows.js input validation, CORS policies, authentication requirements, and error sanitization. Test cases should verify 401 on missing JWT, 400 on malformed or oversized payloads, rating clamping, and rejection of invalid actions. Finished when an automated test runner passes all validation and security test cases.",
+      "notes": [
+        {
+          "at": "2026-10-29T17:04:05Z",
+          "by": "agent",
+          "text": "Plan: add a dependency-free Node test suite for the Netlify handler, mock Neon SQL at the module boundary, cover validation/auth/CORS/error cases, and expose it as a focused package script."
+        },
+        {
+          "at": "2026-10-29T17:05:20Z",
+          "by": "agent",
+          "text": "Added pnpm test:api with six dependency-free handler tests covering authentication, malformed/oversized/non-object bodies, invalid actions/IDs/counts, both rating bounds, metadata whitelisting, CORS allow/deny, and server-only database details. Verified all six tests pass."
+        }
+      ]
+    },
+    {
+      "id": "SC-04",
+      "title": "Implement rate limiting and request throttling for cloud sync endpoint",
+      "state": "review",
+      "group": "SC",
+      "deps": ["SC-03"],
+      "yolo": true,
+      "at": "2026-10-29T16:56:04Z",
+      "by": "antigravity",
+      "desc": "Add protective rate limiting to prevent denial-of-service, quota exhaustion, and abusive write loops on /api/shows. Implement a sliding window or per-user request budget (returning HTTP 429 Too Many Requests when exceeded). Finished when rapid burst requests from a single user are safely throttled without impacting normal app usage.",
+      "notes": [
+        {
+          "at": "2026-10-29T17:06:04Z",
+          "by": "agent",
+          "text": "Plan: inspect normal sync burst behavior, apply a bounded per-user sliding-window limit to authenticated requests, expose Retry-After on 429, and add deterministic burst/reset tests."
+        },
+        {
+          "at": "2026-10-29T17:08:54Z",
+          "by": "agent",
+          "text": "Cloud sync now rejects oversized/malformed requests, stores whitelisted metadata, clamps ratings, sanitizes server errors, and restricts CORS. Authenticated requests are limited to 300 per user per rolling minute; excess requests receive 429 with Retry-After. Added pnpm test:api; all 7 tests and JavaScript syntax checks pass. Please review the validation and burst tests. Limiter state is per warm Netlify function instance, not shared across instances/cold starts; globally coordinated enforcement would need a shared store."
+        }
+      ]
+    }
+  ]
+}

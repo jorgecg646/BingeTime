@@ -1,6 +1,20 @@
 # BingeTime 📺
 
-**BingeTime** (TV Time Calculator) es una aplicación web moderna diseñada para registrar, calcular y hacer seguimiento del tiempo total que has dedicado a ver tus series de televisión favoritas. Construida con **Angular 19** y estilizada de forma interactiva con **Tailwind CSS**, utiliza la API pública de **TVMaze** para obtener datos en tiempo real de miles de shows.
+**BingeTime** (TV Time Calculator) es una aplicación web moderna diseñada para registrar, calcular y hacer seguimiento del tiempo total que has dedicado a ver tus series de televisión favoritas. Construida con **Angular 19** y estilizada de forma interactiva con **Tailwind CSS**, utiliza la API pública de **The Movie Database (TMDB)** para obtener datos en tiempo real de miles de shows, posters, trailers, calendarios y plataformas de streaming.
+
+---
+
+## 📚 Documentación Técnica & AI Guide
+
+Para conocer la arquitectura detallada, el flujo de sincronización y las guías para agentes de IA:
+
+- **[Guía para Agentes de IA](docs/AI_AGENT_GUIDE.md)**: Modelo mental, 7 gotchas críticos y recetas de implementación.
+- **[Arquitectura del Sistema](docs/ARCHITECTURE.md)**: Diseño Angular 19 standalone, signals y estructura de capas.
+- **[Estado y Sincronización](docs/STATE_AND_SYNC.md)**: Offline-first (`localStorage`) y sincronización en la nube con Neon Postgres.
+- **[APIs e Integraciones](docs/API_AND_INTEGRATIONS.md)**: TMDB v3 API, Netlify Functions (`/api/shows`) y servidor local.
+- **[Componentes y Rutas](docs/COMPONENTS_AND_ROUTING.md)**: Catálogo de componentes, modales y navegación.
+- **[Desarrollo y Pruebas](docs/DEVELOPMENT_AND_TESTING.md)**: Variables de entorno, `set-env.js`, PWA y suite de tests Karma/Jasmine.
+- **[Índice Completo de Documentación](docs/README.md)**
 
 ---
 
@@ -20,7 +34,7 @@
 - **Frontend**: [Angular v19](https://angular.dev/)
 - **Estilos**: [Tailwind CSS v3](https://tailwindcss.com/)
 - **Lenguaje**: [TypeScript](https://www.typescriptlang.org/)
-- **API**: [TVMaze API](https://www.tvmaze.com/api)
+- **API**: [The Movie Database (TMDB) API](https://developer.themoviedb.org/) (con soporte de migración legacy para TVMaze)
 - **Gestor de Paquetes**: [pnpm](https://pnpm.io/)
 
 ---

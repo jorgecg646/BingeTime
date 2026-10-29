@@ -6,7 +6,8 @@
     "dev:api": "node local-api-server.js",
     "build": "node set-env.js && ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test --watch=false",
+    "test:api": "node --test netlify/functions/shows.test.js"
   },
   "private": true,
   "dependencies": {
@@ -16,6 +17,7 @@
     "@angular/forms": "^19.0.0",
     "@angular/platform-browser": "^19.0.0",
     "@angular/router": "19.2.25",
+    "@angular/service-worker": "^19.0.0",
     "@neondatabase/serverless": "^0.10.4",
     "gotrue-js": "^1.0.1",
     "rxjs": "~7.8.0",
@@ -26,6 +28,7 @@
     "@angular-devkit/build-angular": "^19.0.0",
     "@angular/cli": "^19.0.0",
     "@angular/compiler-cli": "^19.0.0",
+    "@angular/platform-browser-dynamic": "^19.2.20",
     "@types/jasmine": "^6.0.0",
     "autoprefixer": "^10.4.20",
     "jasmine-core": "^6.2.0",

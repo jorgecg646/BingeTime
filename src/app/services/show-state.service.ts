@@ -1,4 +1,5 @@
 import { Injectable, signal, computed, inject, effect } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { forkJoin, of, Observable } from 'rxjs';
 import { TVShow, WatchedShow, PendingShow, NewEpisodeAlert, NewEpisodeInfo } from '../models';
 import { TmdbService } from './tmdb.service';
@@ -27,6 +28,8 @@ export class ShowStateService {
    * localStorage data is shown immediately; this flag can drive a subtle UI indicator.
    */
   isSyncingFromNeon = signal<boolean>(false);
+  /** User-visible notice when the cloud copy cannot be read or updated. */
+  syncError = signal<string | null>(null);
 
   /** The show currently displayed in the details modal, or null if closed. */
   activeShowForDetails = signal<TVShow | null>(null);
@@ -36,6 +39,18 @@ export class ShowStateService {
   seasonsToAdd = signal<number>(0);
   /** Error/warning message when user attempts to add an unreleased season. */
   seasonWarning = signal<string | null>(null);
+
+  dismissSyncError(): void {
+    this.syncError.set(null);
+  }
+
+  private reportCloudSyncError(operation: string, error: unknown): void {
+    const status = error instanceof HttpErrorResponse ? ` (HTTP ${error.status})` : '';
+    console.error(`Cloud sync failed while ${operation}${status}.`);
+    this.syncError.set(
+      'Your saved list is still available in this browser, but the latest change may not have synced to your account. Check your connection before using another device.'
+    );
+  }
 
   constructor() {
     // Listen for authentication changes to synchronize shows.
@@ -111,7 +126,7 @@ export class ShowStateService {
       localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
       this.autoMigrateLegacyShows();
     } catch (err) {
-      console.error('Error loading user data from Neon:', err);
+      this.reportCloudSyncError('loading your show list', err);
       // Falls back to localStorage data already shown on screen — no disruption.
     } finally {
       this.isSyncingFromNeon.set(false);
@@ -148,7 +163,7 @@ export class ShowStateService {
           };
           if (user) {
             this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err =>
-              console.error('Error syncing migrated watched show to server:', err)
+              this.reportCloudSyncError('saving a migrated watched show', err)
             );
           }
           return updatedItem;
@@ -168,7 +183,7 @@ export class ShowStateService {
           };
           if (user) {
             this.supabaseService.upsertPendingShow(user.id, updatedPending).catch(err =>
-              console.error('Error syncing migrated pending show to server:', err)
+              this.reportCloudSyncError('saving a migrated pending show', err)
             );
           }
           return updatedPending;
@@ -446,7 +461,7 @@ export class ShowStateService {
     const user = this.auth.user();
     if (user) {
       this.supabaseService.upsertWatchedShow(user.id, newInstance).catch(err => {
-        console.error('Error saving show to Supabase:', err);
+        this.reportCloudSyncError('saving a watched show', err);
       });
     }
   }
@@ -488,7 +503,7 @@ export class ShowStateService {
     const user = this.auth.user();
     if (user && updatedItem) {
       this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err => {
-        console.error('Error updating seasons in Supabase:', err);
+        this.reportCloudSyncError('updating watched seasons', err);
       });
     }
   }
@@ -504,7 +519,7 @@ export class ShowStateService {
     const user = this.auth.user();
     if (user) {
       this.supabaseService.deleteWatchedShow(user.id, instanceId).catch(err => {
-        console.error('Error deleting show from Supabase:', err);
+        this.reportCloudSyncError('deleting a watched show', err);
       });
     }
   }
@@ -528,7 +543,7 @@ export class ShowStateService {
     const user = this.auth.user();
     if (user && updatedItem) {
       this.supabaseService.upsertWatchedShow(user.id, updatedItem).catch(err => {
-        console.error('Error saving rating to Supabase:', err);
+        this.reportCloudSyncError('saving a show rating', err);
       });
     }
   }
@@ -551,7 +566,7 @@ export class ShowStateService {
     const user = this.auth.user();
     if (user) {
       this.supabaseService.upsertPendingShow(user.id, entry).catch(err => {
-        console.error('Error saving pending show to Supabase:', err);
+        this.reportCloudSyncError('saving a pending show', err);
       });
     }
   }
@@ -578,7 +593,7 @@ export class ShowStateService {
     const user = this.auth.user();
     if (user && pendingIdToDelete) {
       this.supabaseService.deletePendingShow(user.id, pendingIdToDelete).catch(err => {
-        console.error('Error deleting pending show from Supabase:', err);
+        this.reportCloudSyncError('deleting a pending show', err);
       });
     }
   }
@@ -702,7 +717,7 @@ export class ShowStateService {
       const user = this.auth.user();
       if (user) {
         this.supabaseService.resetAllUserData(user.id).catch(err => {
-          console.error('Error resetting user data on server:', err);
+          this.reportCloudSyncError('resetting cloud data', err);
         });
       }
     }

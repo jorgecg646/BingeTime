@@ -67,8 +67,8 @@ export class AuthService {
         }
       }
       return u.token?.access_token || null;
-    } catch (err) {
-      console.warn('Could not refresh token before API call:', err);
+    } catch {
+      console.warn('Could not refresh the session before an authenticated API request.');
       return u.token?.access_token || null;
     }
   }
@@ -116,7 +116,7 @@ export class AuthService {
             }
           })
           .catch((err: any) => {
-            console.warn('Could not refresh expired token on startup:', err);
+            console.warn('Could not refresh the saved session on startup.');
             // If the refresh token itself is invalid/revoked, clear user; otherwise keep local state
             const msg = (err?.message || '').toLowerCase();
             if (msg.includes('invalid') || msg.includes('revoked')) {
@@ -158,8 +158,8 @@ export class AuthService {
           this.user.set(refreshed);
           this.scheduleNextRefresh(refreshed);
         }
-      } catch (err) {
-        console.warn('Silent token refresh failed, will retry on next API call:', err);
+      } catch {
+        console.warn('Silent session refresh failed; it will be retried on the next API request.');
         // Retry in 2 minutes
         this.refreshTimer = setTimeout(() => {
           if (this.auth.currentUser()) {
@@ -289,4 +289,3 @@ export class AuthService {
     return user;
   }
 }
-

@@ -273,7 +273,7 @@ interface Badge { id: string; name: string; desc: string; icon: string; unlocked
               <div class="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-amber-400/40 transition-all cursor-pointer bg-zinc-950"
                    (click)="state.openDetails(w.show)">
                 <div class="aspect-[2/3] w-full overflow-hidden">
-                  <img [src]="w.show.poster_path" [alt]="w.show.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img [src]="w.show.poster_path" [alt]="w.show.name" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-[10px] font-black text-amber-400 border border-amber-400/30 flex items-center gap-1">
                   <span>★</span><span>{{ w.userRating }}/10</span>
@@ -321,7 +321,7 @@ interface Badge { id: string; name: string; desc: string; icon: string; unlocked
                 <p class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-2">Favorite Series</p>
                 <div class="flex justify-center gap-2">
                   @for (show of topStoryShows(); track show.id) {
-                    <img [src]="show.poster_path" [alt]="show.name" class="w-16 h-24 object-cover rounded-xl shadow-lg border border-white/15" />
+                    <img [src]="show.poster_path" [alt]="show.name" loading="lazy" decoding="async" class="w-16 h-24 object-cover rounded-xl shadow-lg border border-white/15" />
                   }
                 </div>
               </div>

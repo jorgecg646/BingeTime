@@ -28,6 +28,10 @@ export class AppComponent implements OnInit, OnDestroy {
   /** Tracks the previous scroll position to detect scroll direction. */
   private lastScrollTop = 0;
 
+  reloadPage(): void {
+    window.location.reload();
+  }
+
   /**
    * Handles window scroll events to show/hide the navigation bar.
    * Navigation hides when scrolling down and reappears when scrolling up.

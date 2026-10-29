@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { WatchedShow, PendingShow } from '../models';
 import { AuthService } from './auth.service';
@@ -11,6 +11,11 @@ export class SupabaseService {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
   private apiUrl = '/api/shows';
+
+  private logFailure(operation: string, error: unknown): void {
+    const status = error instanceof HttpErrorResponse ? ` (HTTP ${error.status})` : '';
+    console.error(`Cloud ${operation} request failed${status}.`);
+  }
 
   private async getHeaders(): Promise<HttpHeaders> {
     const token = await this.auth.getValidToken();
@@ -33,7 +38,7 @@ export class SupabaseService {
       );
       return { watched: res?.watched || [], pending: res?.pending || [] };
     } catch (error) {
-      console.error('Error fetching shows:', error);
+      this.logFailure('loading shows', error);
       throw error;
     }
   }
@@ -53,7 +58,7 @@ export class SupabaseService {
         )
       );
     } catch (error) {
-      console.error('Error saving watched show:', error);
+      this.logFailure('saving watched show', error);
       throw error;
     }
   }
@@ -73,7 +78,7 @@ export class SupabaseService {
         )
       );
     } catch (error) {
-      console.error('Error deleting watched show:', error);
+      this.logFailure('deleting watched show', error);
       throw error;
     }
   }
@@ -93,7 +98,7 @@ export class SupabaseService {
         )
       );
     } catch (error) {
-      console.error('Error saving pending show:', error);
+      this.logFailure('saving pending show', error);
       throw error;
     }
   }
@@ -113,7 +118,7 @@ export class SupabaseService {
         )
       );
     } catch (error) {
-      console.error('Error deleting pending show:', error);
+      this.logFailure('deleting pending show', error);
       throw error;
     }
   }
@@ -132,7 +137,7 @@ export class SupabaseService {
         )
       );
     } catch (error) {
-      console.error('Error resetting user data:', error);
+      this.logFailure('resetting user data', error);
       throw error;
     }
   }

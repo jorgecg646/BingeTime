@@ -52,12 +52,12 @@ import { ShowStateService } from '../../services/show-state.service';
       </div>
 
       <!-- Backdrop to close dropdown when clicking outside -->
-      @if (showDropdown() && (hasResults() || hasEmptyState())) {
+      @if (showDropdown() && (hasResults() || hasEmptyState() || isLoading())) {
         <div class="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] animate-fade-in" (click)="closeDropdown()"></div>
       }
 
       <!-- Results Dropdown -->
-      @if (showDropdown() && hasResults()) {
+      @if (showDropdown() && (hasResults() || isLoading())) {
         <div class="absolute z-50 w-full mt-2 glass-strong rounded-2xl overflow-hidden animate-fade-in-scale max-h-[75vh] overflow-y-auto custom-scrollbar border border-white/15 shadow-2xl">
 
           <!-- 🌟 SECTION 1: Matches in user's WATCHED SHOWS -->
@@ -75,7 +75,7 @@ import { ShowStateService } from '../../services/show-state.service';
                 class="border-b border-white/5 p-3 hover:bg-emerald-500/10 transition-colors flex items-center justify-between gap-3 cursor-pointer"
                 (click)="state.openDetails(item.show); closeDropdown()">
                 <div class="flex items-center gap-3.5 min-w-0">
-                  <img [src]="item.show.poster_path" [alt]="item.show.name" class="w-10 h-14 object-cover rounded-lg shadow-md shrink-0" />
+                  <img [src]="item.show.poster_path" [alt]="item.show.name" loading="lazy" decoding="async" class="w-10 h-14 object-cover rounded-lg shadow-md shrink-0" />
                   <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
                       <h4 class="text-sm font-bold text-white truncate hover:text-blue-400 transition-colors">{{ item.show.name }}</h4>
@@ -117,7 +117,7 @@ import { ShowStateService } from '../../services/show-state.service';
                 class="border-b border-white/5 p-3 hover:bg-violet-500/10 transition-colors flex items-center justify-between gap-3 cursor-pointer"
                 (click)="state.openDetails(pending.show); closeDropdown()">
                 <div class="flex items-center gap-3.5 min-w-0">
-                  <img [src]="pending.show.poster_path" [alt]="pending.show.name" class="w-10 h-14 object-cover rounded-lg shadow-md shrink-0" />
+                  <img [src]="pending.show.poster_path" [alt]="pending.show.name" loading="lazy" decoding="async" class="w-10 h-14 object-cover rounded-lg shadow-md shrink-0" />
                   <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
                       <h4 class="text-sm font-bold text-white truncate hover:text-blue-400 transition-colors">{{ pending.show.name }}</h4>
@@ -161,7 +161,7 @@ import { ShowStateService } from '../../services/show-state.service';
                      (click)="state.openDetails(show); closeDropdown()">
                   
                   <div class="relative shrink-0">
-                    <img [src]="show.poster_path" [alt]="show.name" class="w-10 h-14 object-cover rounded-lg shadow-md" />
+                    <img [src]="show.poster_path" [alt]="show.name" loading="lazy" decoding="async" class="w-10 h-14 object-cover rounded-lg shadow-md" />
                     @if (state.isWatched(show.id)) {
                       <div class="absolute -top-1 -left-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center text-white border border-emerald-400/30 shadow-md" title="En tus series vistas">
                         <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
@@ -277,6 +277,21 @@ import { ShowStateService } from '../../services/show-state.service';
                 }
               </div>
             }
+          }
+
+          @if (isLoading()) {
+            <div role="status" aria-live="polite" aria-label="Searching TV shows" class="space-y-3 p-4">
+              <span class="sr-only">Searching TV shows...</span>
+              @for (placeholder of [0, 1, 2]; track placeholder) {
+                <div aria-hidden="true" class="flex items-center gap-4 animate-pulse">
+                  <div class="h-14 w-10 shrink-0 rounded-lg bg-white/10"></div>
+                  <div class="min-w-0 flex-1 space-y-2">
+                    <div class="h-3 w-2/5 rounded bg-white/10"></div>
+                    <div class="h-2.5 w-1/4 rounded bg-white/5"></div>
+                  </div>
+                </div>
+              }
+            </div>
           }
 
         </div>

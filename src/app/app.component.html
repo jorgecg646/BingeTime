@@ -33,6 +33,24 @@
     <div class="absolute inset-0 bg-gradient-to-b from-slate-950/60 via-slate-950/80 to-slate-950"></div>
   </div>
 
+  <div class="fixed top-3 inset-x-3 z-[100] mx-auto max-w-3xl space-y-2">
+    @if (tmdb.apiError(); as apiError) {
+      <div role="alert" aria-live="assertive" class="flex items-center justify-between gap-4 rounded-xl border border-amber-400/30 bg-slate-950/95 px-4 py-3 text-sm text-amber-100 shadow-xl backdrop-blur">
+        <p>{{ apiError }}</p>
+        <div class="flex shrink-0 items-center gap-3">
+          <button type="button" (click)="reloadPage()" class="font-semibold underline underline-offset-2">Reload page</button>
+          <button type="button" (click)="tmdb.dismissApiError()" aria-label="Dismiss TMDB error" class="text-amber-200/70 hover:text-white">✕</button>
+        </div>
+      </div>
+    }
+    @if (state.syncError(); as syncError) {
+      <div role="alert" aria-live="assertive" class="flex items-center justify-between gap-4 rounded-xl border border-rose-400/30 bg-slate-950/95 px-4 py-3 text-sm text-rose-100 shadow-xl backdrop-blur">
+        <p>{{ syncError }}</p>
+        <button type="button" (click)="state.dismissSyncError()" aria-label="Dismiss sync error" class="shrink-0 text-rose-200/70 hover:text-white">✕</button>
+      </div>
+    }
+  </div>
+
   <!-- Header -->
   @if (!router.url.includes('/auth')) {
     <header class="pt-20 pb-10 text-center relative z-10">

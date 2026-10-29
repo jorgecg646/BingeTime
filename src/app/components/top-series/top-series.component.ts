@@ -188,11 +188,24 @@ import { ShowStateService } from '../../services/show-state.service';
       </div>
 
       <!-- Content Grid -->
-      <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
-        @for (show of topRatedPageShows(); track show.id; let i = $index) {
-          <ng-container *ngTemplateOutlet="showCard; context: { show: show, index: i, delay: 15 }"></ng-container>
-        }
-      </div>
+      @if (loading()) {
+        <div role="status" aria-live="polite" aria-label="Loading Top 250 shows" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+          <span class="sr-only">Loading the Top 250 shows...</span>
+          @for (placeholder of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]; track placeholder) {
+            <div aria-hidden="true" class="animate-pulse">
+              <div class="aspect-[2/3] rounded-2xl border border-white/5 bg-white/10"></div>
+              <div class="mt-3 h-3 w-3/4 rounded bg-white/10"></div>
+              <div class="mt-2 h-2.5 w-1/2 rounded bg-white/5"></div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+          @for (show of topRatedPageShows(); track show.id; let i = $index) {
+            <ng-container *ngTemplateOutlet="showCard; context: { show: show, index: i, delay: 15 }"></ng-container>
+          }
+        </div>
+      }
 
       <!-- Pagination -->
       @if (topRatedTotalPages() > 1) {
@@ -234,7 +247,7 @@ import { ShowStateService } from '../../services/show-state.service';
     <ng-template #showCard let-show="show" let-i="index" let-delay="delay">
       <div class="group cursor-pointer animate-slide-up" [style.animation-delay]="i * delay + 'ms'" (click)="state.openDetails(show)">
         <div class="relative aspect-[2/3] overflow-hidden rounded-2xl shadow-md hover-lift mb-2 border border-white/5 group-hover:border-white/20 transition-all">
-          <img [src]="show.poster_path" [alt]="show.name" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <img [src]="show.poster_path" [alt]="show.name" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           
           <!-- Rank Badge -->
           <div class="absolute top-2 left-2 z-20 flex items-center gap-1 font-black rounded-lg px-2 py-0.5 shadow-xl backdrop-blur-md text-xs border"
@@ -363,6 +376,7 @@ export class TopSeriesComponent implements OnInit {
 
   /** Full list of top-rated shows fetched from the API. */
   topRatedShows = signal<TVShow[]>([]);
+  loading = signal<boolean>(true);
   /** Current page number in the paginated grid (1-based). */
   topRatedCurrentPage = signal<number>(1);
   /** Currently selected genres filter (multi-select). */
@@ -436,9 +450,14 @@ export class TopSeriesComponent implements OnInit {
 
   loadTopRated(): void {
     const type = this.selectedType();
-    this.tmdb.getTop250Shows(type).subscribe(shows => {
-      this.topRatedShows.set(shows);
-      this.topRatedCurrentPage.set(1);
+    this.loading.set(true);
+    this.tmdb.getTop250Shows(type).subscribe({
+      next: shows => {
+        this.topRatedShows.set(shows);
+        this.topRatedCurrentPage.set(1);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
     });
   }
 
