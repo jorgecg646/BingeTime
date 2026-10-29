@@ -411,7 +411,7 @@
     {
       "id": "SC-04",
       "title": "Implement rate limiting and request throttling for cloud sync endpoint",
-      "state": "review",
+      "state": "done",
       "group": "SC",
       "deps": ["SC-03"],
       "yolo": true,

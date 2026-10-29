@@ -77,55 +77,61 @@ export class ShowStateService {
 
   private async loadUserDataFromNeon(userId: string) {
     this.isSyncingFromNeon.set(true);
+    this.syncError.set(null);
+
+    // Snapshot local state BEFORE any async operation.
+    // If the server call fails, this is the ground truth we keep.
+    const localWatched = this.loadFromStorage();
+    const localPending = this.loadPendingFromStorage();
+
     try {
       const { watched: remoteWatched, pending: remotePending } =
         await this.supabaseService.getAllShows(userId);
 
-      const localWatched = this.loadFromStorage();
-      const localPending = this.loadPendingFromStorage();
-
       // --- Watched shows ---
-      // Only migrate local→server when the server has ZERO records (true first login).
-      // In all other cases the server is the source of truth.
       if (remoteWatched.length === 0 && localWatched.length > 0) {
+        // True first login: migrate all local data to the server.
         for (const item of localWatched) {
           await this.supabaseService.upsertWatchedShow(userId, item);
         }
-        this.watchedShows.set(localWatched); // already sorted by loadFromStorage
+        this.watchedShows.set(localWatched);
       } else {
-        // Server data: ensure all items are timestamped and sorted
+        // Server has data: repair timestamps and use server as source of truth.
+        // We do NOT merge local items that are missing from the server — those
+        // were intentionally deleted from another device and should stay deleted.
         const baseNow = Date.now();
         const repairedRemote = remoteWatched.map((w, index) => {
           let ts = this.getShowTimestamp(w);
           if (ts === 0) {
             ts = baseNow - (index * 60000);
           }
-          return {
-            ...w,
-            addedAt: ts
-          };
+          return { ...w, addedAt: ts };
         });
-        const sorted = this.sortByAddedAt(repairedRemote);
-        this.watchedShows.set(sorted);
+
+        this.watchedShows.set(this.sortByAddedAt(repairedRemote));
       }
 
       // --- Pending shows ---
       if (remotePending.length === 0 && localPending.length > 0) {
+        // True first login: migrate all local pending to the server.
         for (const item of localPending) {
           await this.supabaseService.upsertPendingShow(userId, item);
         }
         this.pendingShows.set(localPending);
       } else {
-        // Server always wins.
+        // Server has data: use it as the source of truth.
+        // We do NOT merge local pending items missing from the server — those
+        // were intentionally deleted or moved to watched from another device.
         this.pendingShows.set(remotePending);
       }
 
-      // Persist the fresh server data to localStorage so the next page visit
-      // can show it instantly as a cache while the background sync runs.
+      // Persist the merged result to localStorage as a fresh cache.
       localStorage.setItem('watchedShows', JSON.stringify(this.watchedShows()));
       localStorage.setItem('pendingShows', JSON.stringify(this.pendingShows()));
       this.autoMigrateLegacyShows();
     } catch (err) {
+      this.watchedShows.set(localWatched);
+      this.pendingShows.set(localPending);
       this.reportCloudSyncError('loading your show list', err);
       // Falls back to localStorage data already shown on screen — no disruption.
     } finally {

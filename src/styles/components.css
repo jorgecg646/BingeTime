@@ -62,7 +62,7 @@
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 9999px;
-  object-cover: cover;
+  object-fit: cover;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 

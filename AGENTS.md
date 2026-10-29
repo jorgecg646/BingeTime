@@ -10,4 +10,3 @@ Before implementing features or modifying code, consult the project documentatio
 - **[APIs & Integrations](docs/API_AND_INTEGRATIONS.md)**: TMDB v3 API caching, Netlify Functions (`/api/shows`), and local API server.
 - **[Components & Routing](docs/COMPONENTS_AND_ROUTING.md)**: Routing table, guards, and component catalog.
 - **[Development & Testing](docs/DEVELOPMENT_AND_TESTING.md)**: Local dev setup, `set-env.js`, and Jasmine/Karma testing.
-
